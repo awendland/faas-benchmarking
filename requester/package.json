@@ -1,0 +1,12 @@
+{
+  "name": "requester",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "private": true,
+  "dependencies": {
+    "@awaitjs/express": "^0.3.0",
+    "artillery": "^1.6.0-27",
+    "express": "^4.16.4"
+  }
+}
