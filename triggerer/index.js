@@ -14,6 +14,12 @@ async function run() {
   })
 
   app.postAsync('/start', async (req, res) => {
+    // WINDOW_SIZE
+    // REQUEST_PER_WINDOW
+    // needs to track if it's actually hitting this window
+    req.params.requests_per_window
+    req.params.window_length
+    req.params.request_payload // Static for now
     // TODO
     res.send({})
   })
