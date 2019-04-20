@@ -1,5 +1,5 @@
 const _ = require('lodash')
-const wretch = require('./web')
+const got = require('got')
 
 class HttpEngine {
   // Get TCP RTT using https://nodejs.org/api/net.html#net_event_connect
@@ -15,6 +15,8 @@ class HttpEngine {
     this.requestPayload = requestPayload
     this.requestUrls = requestUrls
 
+    this.http = got.create() // Removes defaults like following redirects
+
     this.running = false
     this.timeoutId = null
   }
@@ -27,6 +29,8 @@ class HttpEngine {
   stop() {
     this.shouldRun = false
     this._cancelWindow()
+    // TODO consider making requests abortable
+    // https://github.com/sindresorhus/got#aborting-the-request
   }
 
   _cancelWindow() {
@@ -53,12 +57,7 @@ class HttpEngine {
     requests = _.range(0, this.requestsPerWindow)
       .map(async (i) => {
         const url = this.requestUrls[i % this.requestUrls.length]
-        let timing = null
-        // TODO disable all special parsing and URL following junk in this
-        const res = await wretch(url)
-          .get()
-          .perfs(t => { timing = t })
-          .res() // or .text()/.json if parsing response
+        const { response, timings} = await this.http.get(url)
         return { url, timing }
       })
     timings = await promise.all(requests)

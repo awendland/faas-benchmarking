@@ -1,6 +1,6 @@
-const wretch = require('../web')
+const got = require('got')
 
-class HttpRequester {
+class HttpTriggerer {
   constructor(provider, {size, libVersion}) {
     this.provider = provider
     this.size = size
@@ -32,7 +32,7 @@ class HttpRequester {
 
   async isReachable() {
     try {
-      await wretch(`http://${this.vm.publicDNS}/health`).get().text()
+      await got.get(`http://${this.vm.publicDNS}/health`)
       return true
     } catch(e) {
       return false

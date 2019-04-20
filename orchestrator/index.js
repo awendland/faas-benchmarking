@@ -1,6 +1,5 @@
 // Imports
 const fs = require('fs')
-const wretch = require('./lib/web')
 
 run().catch(e => console.error(e.stack))
 
