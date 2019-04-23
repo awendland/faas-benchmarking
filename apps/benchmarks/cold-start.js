@@ -1,40 +1,46 @@
+const path = require('path')
 
 module.exports.Benchmark = class Benchmark {
-  constructor({logger}) {
+  constructor({ provider, logger }) {
+    this.provider = provider
     this.name = `cold-start`
     this.logger = logger
     this.teardowns = []
   }
 
-  async setup() {
-    this.logger.info(`Function count: ${NUM_FUNCTIONS}`)
-    fns = Promise.all(
-      range(0, NUM_FUNCTIONS)
+  async setup({
+    numFunctions,
+  } = {
+    numFunctions: process.env['NUM_FNS'] || 10,
+  }) {
+    this.logger.info(`Function count: ${numFunctions}`)
+    // TODO allow tuning the size of the source code payload
+    const fnFactory = await FaasFactory.setup(this.provider, {
+      name: 'cold-start',
+      sourceDir: process.env['FN_SRC_DIR'] || path.join(__dirname, '../faas/'),
+      handlerId: 'index.handler',
+    })
+    fns = Promise.all(_.range(0, numFunctions)
       .map(async (i) => {
-        // TODO can different lambdas share the same source but have different URIs (and therefore
-        // be different lambdas?
-        const nonce = `${i}-${Date.now}`
-        await fs.writeFile(path.join(FUNCTION_SRC_FOLDER, 'nonce'), nonce)
-        // TODO allow tuning the size of the source code payload
-        fn = new FaaSInstance({
-          provider: aws,
+        fn = fnFactory.build({
           name: `cold-start-${i}`,
-          sourceFolder: FUNCTION_SRC_FOLDER,
-          trigger: "http",
+          runtime: 'Node8',
+          size: 128,
+          timeout: 300,
         })
         this.teardowns.push(await fn.deploy())
         this.logger.info(`.`, {end: ''})
       }))
     this.logger.info(``)
     this.logger.info(`Preparing triggerer`)
-    await triggerer.prepare("cold-start", {
-      functionUris: fns.map(f => f.name),
-      rps: REQUESTS_PER_SECOND, // TODO this will likely need to be more complex
-    })
+    // await triggerer.prepare('cold-start', {
+    //   functionUris: fns.map(f => f.url),
+    //   rps: REQUESTS_PER_SECOND, // TODO this will likely need to be more complex
+    // })
   }
 
   async run() {
-    await triggerer.run({logger: logger})
+    await triggerer.run({ logger: this.logger })
   }
 
   async teardown() {
