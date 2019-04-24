@@ -4,6 +4,7 @@ const Promise = require('bluebird')
 const winston = require('winston')
 const { FaasFactory } = require('./lib/infra/components/Faas')
 const { AwsProvider } = require('./lib/infra/providers/aws')
+const { sleep } = require('./lib/utils')
 
 run().catch(e => console.error(e.stack))
 
@@ -47,6 +48,7 @@ async function run() {
           timeout: 300,
         })
         teardowns.push(await fn.deploy())
+        await sleep(1000)
         return fn
       } catch (error) {
         logger.error({ message: `Failed to create FaaSInstance #${i}`, error })

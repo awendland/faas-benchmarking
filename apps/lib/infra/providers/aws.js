@@ -1,6 +1,7 @@
 const aws = require('aws-sdk')
 const archiver = require('archiver')
 const path = require('path')
+const { sleep } = require('../../utils')
 
 module.exports.AwsProvider = {
   create: async ({
@@ -154,7 +155,7 @@ module.exports.AwsProvider = {
     }
 
     const createLambdaIAMRole = async () => {
-      const RoleName = `${projectName}-faas`
+      const RoleName = process.env['IAM_ROLE'] || `${projectName}-faas`
       try {
         const roleResp = await iam.getRole({ RoleName }).promise()
         faasIamRole = roleResp.Role.Arn
@@ -170,7 +171,7 @@ module.exports.AwsProvider = {
            RoleName,
         }).promise()
         faasIamRole = createRoleResp.Role.Arn
-        await new Promise(r => setTimeout(() => r(), 7000))
+        await sleep(8000)
         logger.debug(`Finished setting up IAM user "${faasIamRole}"`)
       }
     }
