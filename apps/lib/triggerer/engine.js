@@ -81,10 +81,15 @@ module.exports.HttpEngine = class HttpEngine {
               this.pendingRequests.splice(this.pendingRequests.indexOf(request), 1)
               this.responses.push({
                 ...metadata,
-                timings: response.timings,
+                round: this._tick,
+                aws_latency: response.body.triggeredTime - response.timings.upload,
+                initDuration: response.body.triggeredTime - response.body.initTime,
+                runCount: response.body.runCount,
                 upload_latency: response.timings.upload - response.timings.start,
                 connect_latency: response.timings.connect - response.timings.start,
+                url: url,
                 body: response.body,
+                timings: response.timings,
               })
             })
             .catch(e => {
