@@ -170,6 +170,7 @@ module.exports.AwsProvider = {
            RoleName,
         }).promise()
         faasIamRole = createRoleResp.Role.Arn
+        await new Promise(r => setTimeout(() => r(), 7000))
         logger.debug(`Finished setting up IAM user "${faasIamRole}"`)
       }
     }
