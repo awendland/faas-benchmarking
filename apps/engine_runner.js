@@ -1,15 +1,18 @@
-const { HttpEngine } = require('./lib/engine')
+const { HttpEngine } = require('./lib/triggerer/engine')
 
-const engine = new HttpEngine({
-  windowSize: 100,
-  requestsPerWindow: 200,
+const warm_start_engine = new HttpEngine({
+  windowSize: 250,
+  requestsPerWindow: 1,
   requestPayloads: null,
-  requestUrls: ['http://alexwendland.com'],
+  requestUrls: ['https://dcd6lfz4a9.execute-api.us-east-1.amazonaws.com/test/test-0'],
   logger: console,
 })
 
-engine.run()
+warm_start_engine.run()
 
 setTimeout(() => {
-  engine.stop()
-}, 10000)
+  warm_start_engine.stop()
+  console.dir(warm_start_engine.responses)
+}, 1000)
+
+//.map(r => r.timings.phases)
