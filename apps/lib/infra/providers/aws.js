@@ -21,8 +21,10 @@ module.exports.AwsProvider = {
 
     const { User: { Arn: userIamArn } } = await iam.getUser().promise()
     const accountId = userIamArn.match(/iam::(\d+):user/)[1]
+    const Tags = { 'Project': projectName }
+    const faasRestGatewayStage = 'test'
 
-    let faasSrcBucket, faasIamRole, faasRestGateway, faasRestGatewayStage
+    let faasSrcBucket, faasIamRole, faasRestGateway
 
     ////////////////////
     // Public Methods //
@@ -43,6 +45,11 @@ module.exports.AwsProvider = {
       },
 
       faas: {
+        prepareHttpTrigger: async () => {
+          if (!faasRestGateway) await createApiGateway()
+          if (!faasIamRole) await createLambdaIAMRole()
+        },
+
         prepareHandlerCode: async (name, sourceDir, handlerId) => {
           if (!faasSrcBucket) {
             faasSrcBucket = `${projectName}-faas-src`
@@ -71,13 +78,10 @@ module.exports.AwsProvider = {
         } = {
           timeout: 300
         }) => {
-          // Ensure dependencies are satisfied
-          if (!faasRestGateway) await createApiGateway()
-          if (!faasIamRole) await createLambdaIAMRole()
           // Create the Lambda
           const lambdaRuntime = LAMBDA_RUNTIMES[runtime]
           logger.debug(`Creating Lambda "${name}" w/ mem=${size} timeout=${timeout} runtime=${lambdaRuntime}`)
-          const data = await lambda.createFunction({
+          const { FunctionArn } = await lambda.createFunction({
             Code: handlerCode.location,
             FunctionName: name,
             Handler: handlerCode.handlerId,
@@ -85,22 +89,31 @@ module.exports.AwsProvider = {
             Timeout: timeout,
             Runtime: lambdaRuntime,
             MemorySize: size,
+            Publish: true,
+            Tags,
           }).promise()
           // Connect the Lambda to the API Gateway
-          await addLambdaToApiGateway({ name })
+          await addLambdaToApiGateway({ name, lambdaArn: FunctionArn })
           return {
             name,
-            url: `http://${faasRestGateway.restApiId}.execute-api.${region}.amazonaws.com/${faasRestGatewayStage}/${name}`,
+            arn: FunctionArn,
+            // NOTE API Gateway only works over HTTPS
+            url: `https://${faasRestGateway.restApiId}.execute-api.${region}.amazonaws.com/${faasRestGatewayStage}/${name}`,
           }
         },
 
         publishHttpFunctions: async () => {
-          const { deploymentId } = await apigtw.createDeployment({ restApiId: faasRestGateway.restApiId })
-          await apigtw.updateStage({
-            restApiId: faasRestGatewayStage.restApiId,
+          logger.debug(`Deploying API Gateway "${faasRestGateway.restApiId}" to "${faasRestGatewayStage}"`)
+          const { deploymentId } = await apigtw.createDeployment({
+            restApiId: faasRestGateway.restApiId,
             stageName: faasRestGatewayStage,
-            patchOperations: [{ op: 'replace', path: '/deploymentId', value: deploymentId }],
-          })
+          }).promise()
+          // await apigtw.createStage({
+          //   restApiId: faasRestGateway.restApiId,
+          //   stageName: faasRestGatewayStage,
+          //   deploymentId
+          //   patchOperations: [{ op: 'replace', path: '/deploymentId', value: deploymentId }],
+          // })
         },
       },
     }
@@ -132,11 +145,11 @@ module.exports.AwsProvider = {
       logger.debug(`Creating RestAPI on API Gateway for "${projectName}"`)
       const { id: restApiId } = await apigtw.createRestApi({
         name: projectName,
+        description: `${new Date()}`,
         endpointConfiguration: { types: ["REGIONAL"] },
       }).promise()
       const { items } = await apigtw.getResources({ restApiId }).promise()
       faasRestGateway = { restApiId, parentId: items[0].id }
-      faasRestGatewayStage = 'test'
       logger.debug(`Created API Gateway for "${projectName}" rest_api_id=${restApiId} parent_id=${faasRestGateway.parentId}`)
     }
 
@@ -161,10 +174,10 @@ module.exports.AwsProvider = {
       }
     }
 
-    const addLambdaToApiGateway = async ({ name }) => {
+    const addLambdaToApiGateway = async ({ name, lambdaArn }) => {
       // TODO add way to delete these integrations
       logger.debug(`Creating API Gateway resource at "/${name}"`)
-      const { id: apiGtwResId, apiGtwResPath } = await apigtw.createResource({
+      const { id: apiGtwResId, path: apiGtwResPath } = await apigtw.createResource({
         ...faasRestGateway,
         pathPart: name,
       }).promise()
@@ -180,9 +193,20 @@ module.exports.AwsProvider = {
       logger.debug(`Linking ${integrationParams.httpMethod} "/${name}" to Lambda`)
       await apigtw.putIntegration({
         ...integrationParams,
-        type: 'AWS',
+        type: 'AWS_PROXY',
         uri: `arn:aws:apigateway:${region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${region}:${accountId}:function:${name}/invocations`,
         integrationHttpMethod: 'POST',
+        // requestTemplates: {
+        //   'application/json': `{
+  // "body" : $input.json('$'),
+  // "headers": {
+    // #foreach($param in $input.params().header.keySet())
+    // "$param": "$util.escapeJavaScript($input.params().header.get($param))" #if($foreach.hasNext),#end
+    
+    // #end  
+  // }
+// }`,
+        // },
       }).promise()
       logger.debug(`Creating response for ${integrationParams.httpMethod} "/${name}"`)
       await apigtw.putMethodResponse({
@@ -199,9 +223,8 @@ module.exports.AwsProvider = {
       logger.debug(`Granting API Gateway permission to invoke Lambda "${name}"`)
       await lambda.addPermission({
           Action: 'lambda:InvokeFunction',
-          FunctionName: name,
+          FunctionName: lambdaArn,
           Principal: 'apigateway.amazonaws.com',
-          SourceAccount: accountId,
           SourceArn: `arn:aws:execute-api:${region}:${accountId}:${faasRestGateway.restApiId}/*/${integrationParams.httpMethod}${apiGtwResPath}`,
           StatementId: `api-gateway-${name}`,
       }).promise()

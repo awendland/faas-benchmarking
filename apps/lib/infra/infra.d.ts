@@ -41,6 +41,9 @@ type Provider<HandlerCode> = {
   // FaaS //
   //////////
   faas: {
+    // TODO should this be refactored so that Provider is stateless?
+    prepareHttpTrigger(): Promise<void>
+
     /**
      * Prepare a directory of source code containing a handler for usage in a FaaS function for
      * this provider.
