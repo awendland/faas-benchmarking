@@ -20,7 +20,7 @@ module.exports.HttpEngine = class HttpEngine {
     this._http = got.extend({
       retry: 0,
       followRedirect: false,
-      responseType: 'buffer',
+      responseType: 'text',
     })
 
     this._tick = 0
@@ -75,16 +75,16 @@ module.exports.HttpEngine = class HttpEngine {
         .map((i) => {
           const url = this.requestUrls[i % this.requestUrls.length]
           const metadata = { url, _tick: this._tick }
-          const request = this._http.get(url)
+          const request = this._http.post(url)
           request
             .then(response => {
               this.pendingRequests.splice(this.pendingRequests.indexOf(request), 1)
               this.responses.push({
                 ...metadata,
-                uploadTime: response.timings.upload,
-                responseTime: response.timings.response,
-                tcpRTT: response.timings.phases.tcp,
-                totalRTT: response.timings.phases.total,
+                timings: response.timings,
+                upload_latency: response.timings.upload - response.timings.start,
+                connect_latency: response.timings.connect - response.timings.start,
+                body: response.body,
               })
             })
             .catch(e => {
