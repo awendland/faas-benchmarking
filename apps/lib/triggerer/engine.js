@@ -59,10 +59,10 @@ module.exports.HttpEngine = class HttpEngine {
       if (windowStart - lastStart > this.windowSize * 1.1)
         this.logger.warn(`CAN'T HIT LOAD TARGET! Took ${windowStart - lastStart}ms between ticks`)
       lastStart = windowStart
-      this._tick++
-      this.logger.debug(`${windowStart} num_resp=${this.responses.length}\tnum_err=${this.errors.length}\tpending_req=${this.pendingRequests.length}\tlast_10: ${this.responses.slice(-10).map(r => r ? r.connectLatency : 'TT').join(" ")}`)
+      this.logger.debug(`${windowStart} num_resp=${this.responses.length}\tnum_err=${this.errors.length}\tpending_req=${this.pendingRequests.length}\tlast_10: ${this.responses.slice(-10).map(r => r ? r.timings.phases.total : 'TT').join(" ")}`)
 
       await this._sendRequests()
+      this._tick++
 
       const elapsed = Date.now() - windowStart
       const sleepMs = this.windowSize - elapsed
