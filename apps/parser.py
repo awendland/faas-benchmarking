@@ -3,17 +3,13 @@ from matplotlib import cm
 import numpy as np
 import json
 
-cold_threshold = 200
-warm_threshold = 100
+#aws_latency
 
+def aws_latency(response):
+	return response.body.triggeredTime - response.timings.upload
 # round: this._tick,
 # window
 # size
-# aws_latency: response.body.triggeredTime - response.timings.upload,
-# initDuration: response.body.triggeredTime - response.body.initTime,
-# runCount: response.body.runCount,
-# upload_latency: response.timings.upload - response.timings.start,
-# connect_latency: response.timings.connect - response.timings.start,
 # url: url,
 # body: response.body,
 # timings: response.timings,
@@ -27,7 +23,7 @@ def over_time(responses, y_axis):
 		last_round = 0
 		for response in responses:
 			last_round = max(last_round, response.round)
-			y_tmp.setdefault(response.round, []).append(response[aws_latency])
+			y_tmp.setdefault(response.round, []).append(aws_latency(response))
 		stdev = [0 for i in range(last_round+1)]
 		y_avg = [0 for i in range(last_round+1)]
 		x_time = [0 for i in range(last_round+1)]
@@ -47,8 +43,7 @@ def over_time(responses, y_axis):
 		return results
 
 	if y_axis == "cold_v_warm":
-		y_cold = [0 for i in range(last_round+1)]
-		y_warm = [0 for i in range(last_round+1)]
+		y_new = [0 for i in range(last_round+1)]
 		y_old = [0 for i in range(last_round+1)]
 		y_total = [0 for i in range(last_round+1)]
 		last_round = 0
@@ -56,19 +51,16 @@ def over_time(responses, y_axis):
 		for response in responses:
 			last_round = max(last_round, response.round)
 			y_total[response.round] += 1
-			if response.aws_latency > cold_threshold:
-				y_warm[response.round] += 1
-			elif response.aws_latency < warm_threshold:
-				y_cold[response.round] += 1
-
 			if response.runCount > 0:
 				y_old[response.round] += 1
+			else:
+				y_new[response.round] += 1
 
 		x_time = [0 for i in range(last_round+1)]
 		for i in range(last_round+1):
 			x_time[i] = (i+1)*window
 
-		plt.plot(x_time, y_total, 'k.', x_time, y_cold, 'co', x_time, y_warm, 'r^', x_time, y_old, 'yv')
+		plt.plot(x_time, y_total, 'k.', x_time, y_new, 'co', x_time, y_old, 'g^')
 		plt.xlabel('Time (ms)', fontsize=18)
 		plt.ylabel('# of VMs', fontsize=16)
 
@@ -78,16 +70,31 @@ def over_time(responses, y_axis):
 		results = zip(x_time, y_total, y_cold, y_warm, y_old)
 		return results
 	return "valid options: latency or cold_v_warm"
-	
+
 # x_axis: latency
 # y_axis: percent
-def cdf(responses):
-	responses = sorted(responses, key=lambda response: response.aws_latency)
+def cdf(responses, options=None):
+	responses = sorted(responses, key=lambda response: aws_latency(response))
+
+	if options=="cold":
+		cold = []
+		for response in enumerate(responses):
+			if responses.runCount == 0:
+				cold.append(response)
+		responses = cold
+
+	if options=="warm":
+		warm = []
+		for response in enumerate(responses):
+			if responses.runCount > 0:
+				warm.append(response)
+		responses = warm
+
 	points = len(responses)
 	y = [0]
 	x = [0]
 	for i in range(1, points+1):
-		x.append(responses[i].aws_latency)
+		x.append(aws_latency(responses[i]))
 		y.append(i / points)
 
 	plt.plot(x, y, '-')
@@ -101,12 +108,12 @@ def cdf(responses):
 
 def cdf_helper(responses, max_latency, points):
 	total = len(responses)
-	responses = sorted(responses, key=lambda response: response.aws_latency)
+	responses = sorted(responses, key=lambda response: aws_latency(response))
 	x = [i*max_latency/(points-1) for i in range(points)]
 	y = []
 	cur = 0
 	for latency in x:
-		while responses and responses[0].aws_latency <= latency:
+		while responses and aws_latency(responses[0]) <= latency:
 			cur += 1
 			responses.pop()
 		y.append(cur/total)
@@ -123,7 +130,7 @@ def cdf_3d(responses):
 	rounds = {}
 	for response in responses:
 		rounds.setdefault(response.round, []).append(response)
-		max_latency = max(max_latency, response.aws_latency)
+		max_latency = max(max_latency, aws_latency(response))
 		last_round = max(last_round, response.round)
 
 	x = np.linspace(0, last_round, last_round+1)
@@ -150,23 +157,15 @@ def main():
 	file = open(filename)
 	responses = json.load(file)
 
-	cold = data["cold_start"]
-	warm = data["warm_start"]
-
-	global cold_threshold
-	global warm_threshold
-	cold_threshold = cold
-	warm_threshold = warm
-
 	graph = data["graph"]
 	options = data.setdefault("options", None)
 	if graph == "3d_cdf":
 		return cdf_3d(responses)
 	if graph == "cdf":
-		return cdf(responses)
+		return cdf(responses, options)
 	if graph == "line":
 		# options: "latency", "cold_v_warm"
-		return over_time(responses, options)
+		return over_time(responses)
 
 if__name__== "__main__":
 	main()
