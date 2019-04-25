@@ -7,7 +7,7 @@ import sys
 #aws_latency
 
 def aws_latency(response):
-	return response['body']['triggeredTime'] - response['timings']['upload']
+	return json.loads(response['body'])['triggeredTime'] - response['timings']['upload']
 # round: this._tick,
 # window
 # size
