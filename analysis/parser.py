@@ -14,6 +14,7 @@ def calc_latency(response, method="upload_rtt_adj"):
         client_trigger_time = response['timings']['upload'] - tcp_latency
         return response['json']['triggeredTime'] - client_trigger_time
     elif method == "req_rtt":
+        print("hi")
         return response['timings']['response'] - response['timings']['upload']
 # round: this._tick,
 # window
@@ -32,21 +33,24 @@ def over_time(responses, out_prefix, percentiles="5,95", y_axis="latency", laten
         last_round = 0
         for response in responses:
             last_round = max(last_round, response['tick'])
-            y_tmp.setdefault(response['tick'], []).append(calc_latency(response))
-        
+            y_tmp.setdefault(response['tick'], []).append(calc_latency(response, method=latency))
         percs = [int(s) for s in percentiles.split(",")]
-        y_percs, y_avg, x_time = [], [], []
+        y_percs, y_avg, x_time = [[],[]], [], []
         for i in range(last_round+1):
-            y_percs.append((np.percentile(y_tmp[i], percs[0]), np.percentile(y_tmp[i], percs[1])))
-            y_avg.append(np.average(y_tmp[i]))
+            avg = np.average(y_tmp[i])
+            if(avg < 0):
+                print(avg)
+            y_percs[0].append(avg - np.percentile(y_tmp[i], percs[0]))
+            y_percs[1].append(np.percentile(y_tmp[i], percs[1]) - avg)
+            y_avg.append(avg)
             x_time.append((i+1)*window)
 
         plt.errorbar(x_time, y_avg, yerr=y_percs, fmt='go-')
         plt.xlabel('Time (ms)', fontsize=18)
         plt.ylabel('Latency (ms)', fontsize=16)
 
-        fig = plt.figure()
-        fig.savefig(out_prefix + "_latency_line_" + latency + '.png')
+        plt.show()
+        plt.savefig(out_prefix + "_latency_line_" + latency + '.png')
 
     if y_axis == "cold_v_warm":
         y_new = [0 for i in range(last_round+1)]
@@ -110,12 +114,12 @@ def cdf(responses, out_prefix, filter="all", latency="upload_rtt_adj"):
 
 def cdf_helper(responses, max_latency, points):
     total = len(responses)
-    responses = sorted(responses, key=lambda response: calc_latency(response))
+    responses = sorted(responses, key=lambda response: calc_latency(response, method=latency))
     x = [i*max_latency/(points-1) for i in range(points)]
     y = []
     cur = 0
     for latency in x:
-        while responses and calc_latency(responses[0]) <= latency:
+        while responses and calc_latency(responses[0], method=latency) <= latency:
             cur += 1
             responses.pop()
         y.append(cur/total)
@@ -132,7 +136,7 @@ def cdf_3d(responses, out_prefix):
     rounds = {}
     for response in responses:
         rounds.setdefault(response['round'], []).append(response)
-        max_latency = max(max_latency, calc_latency(response))
+        max_latency = max(max_latency, calc_latency(response, method=latency))
         last_round = max(last_round, response['round'])
 
     x = np.linspace(0, last_round, last_round+1)
