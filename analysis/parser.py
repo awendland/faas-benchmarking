@@ -2,11 +2,12 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 import numpy as np
 import json
+import sys
 
 #aws_latency
 
 def aws_latency(response):
-	return response.body.triggeredTime - response.timings.upload
+	return response['body']['triggeredTime'] - response['timings']['upload']
 # round: this._tick,
 # window
 # size
@@ -17,6 +18,7 @@ def aws_latency(response):
 # x_axis: "tick"
 # y_axis: "latency", "cold_v_warm"
 def over_time(responses, y_axis):
+	window = responses[0].window
 
 	if y_axis == "latency":
 		y_tmp = {}
@@ -67,7 +69,7 @@ def over_time(responses, y_axis):
 		fig = plt.figure()
 		fig.savefig(filename + "_cold_v_warm" + '.jpg')
 
-		results = zip(x_time, y_total, y_cold, y_warm, y_old)
+		results = zip(x_time, y_total, y_old, y_new)
 		return results
 	return "valid options: latency or cold_v_warm"
 
@@ -149,23 +151,24 @@ def cdf_3d(responses):
                        linewidth=0, antialiased=False)
 	fig.savefig(filename + "_cdf_over_time" + '.jpg')
 
-def main():
-	data=json.loads(argv[1])
+filename = None
 
-	filename = data["file"]
+def main():
+	global filename
+	filename = sys.argv[1]
 	file = open(filename)
 	f_data = json.load(file)
-	responses = f_data[responses]
+	responses = f_data['responses']
 
-	graph = data["graph"]
-	options = data.setdefault("options", None)
+	graph = sys.argv[2]
+	options = sys.argv[3] if len(sys.argv) > 3 else None
 	if graph == "3d_cdf":
 		return cdf_3d(responses)
 	if graph == "cdf":
 		return cdf(responses, options)
 	if graph == "line":
 		# options: "latency", "cold_v_warm"
-		return over_time(responses)
+		return over_time(responses, options)
 
 if __name__== "__main__":
 	main()
