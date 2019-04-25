@@ -39,7 +39,7 @@ def over_time(responses, y_axis):
 		plt.ylabel('Latency (ms)', fontsize=16)
 
 		fig = plt.figure()
-		fig.savefig(filename + "_latency_time" + '.jpg')
+		fig.savefig(filename + "_latency_time" + '.png')
 
 		results = zip(x_time, y_avg, stdev)
 		return results
@@ -67,7 +67,7 @@ def over_time(responses, y_axis):
 		plt.ylabel('# of VMs', fontsize=16)
 
 		fig = plt.figure()
-		fig.savefig(filename + "_cold_v_warm" + '.jpg')
+		fig.savefig(filename + "_cold_v_warm" + '.png')
 
 		results = zip(x_time, y_total, y_old, y_new)
 		return results
@@ -95,7 +95,7 @@ def cdf(responses, options=None):
 	points = len(responses)
 	y = [0]
 	x = [0]
-	for i in range(1, points+1):
+	for i in range(0, points):
 		x.append(aws_latency(responses[i]))
 		y.append(i / points)
 
@@ -104,7 +104,7 @@ def cdf(responses, options=None):
 	plt.ylabel('%% of VMs', fontsize=16)
 
 	fig = plt.figure()
-	fig.savefig(filename + "_latency_CDF" + '.jpg')
+	fig.savefig(filename + "_latency_CDF" + '.png')
 
 	return zip(x, y)
 

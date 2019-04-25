@@ -1,4 +1,4 @@
-results*.json
+results*
 
 # Created by https://www.gitignore.io/api/vim,node,code,linux,macos,windows
 # Edit at https://www.gitignore.io/?templates=vim,node,code,linux,macos,windows
