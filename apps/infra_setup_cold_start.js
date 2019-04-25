@@ -6,23 +6,30 @@ const { FaasFactory } = require('./lib/infra/components/Faas')
 const { AwsProvider } = require('./lib/infra/providers/aws')
 const { sleep } = require('./lib/utils')
 
+const argv = require('minimist')(process.argv.slice(2))
+
+const params = {
+  numFns: parseInt(argv.numfns || process.env['NUM_FNS']) || 10,
+  logLevel: argv.loglevel || process.env['LOG_LEVEL'] || 'verbose',
+  projectName: argv['project-name'] || process.env['PROJ_NAME'] || `test-${Date.now().toString(36)}`,
+  sourceDir: argv.source || process.env['FN_SRC_DIR'] || path.join(__dirname, 'faas/'),
+}
+
 run().catch(e => console.error(e.stack))
 
 async function run() {
-  const numFns = parseInt(process.env['NUM_FNS']) || 10
   const logger = winston.createLogger({
     transports: [new winston.transports.Console({
-      level: process.env['LOG_LEVEL'] || 'verbose',
+      level: params.logLevel,
       format: winston.format.simple(),
     })]
   })
-  const projectName = process.env['TEST_NAME'] || `test-${Date.now().toString(36)}`
   const provider = await AwsProvider.create({
-    projectName,
+    projectName: params.projectName,
     logger: logger,
     region: 'us-east-1',
   })
-  teardowns = []
+  const teardowns = []
   let lastTime = Date.now()
 
   await provider.faas.prepareHttpTrigger()
@@ -31,18 +38,18 @@ async function run() {
   lastTime = Date.now()
   const fnFactory = await FaasFactory.setup(provider, {
     name: 'standard',
-    sourceDir: process.env['FN_SRC_DIR'] || path.join(__dirname, 'faas/'),
+    sourceDir: params.sourceDir,
     handlerId: 'index.handler',
   })
   logger.verbose(`FaasFactory setup took ${Date.now() - lastTime}ms`)
 
   lastTime = Date.now()
-  fns = await Promise.map(
-    _.range(0, numFns),
+  const fns = await Promise.map(
+    _.range(0, params.numFns),
     async (i) => {
       try {
-        fn = fnFactory.build({
-          name: `${projectName}-${i}`,
+        const fn = fnFactory.build({
+          name: `${params.projectName}-${i}`,
           runtime: 'Node8',
           size: 128,
           timeout: 300,
@@ -58,7 +65,7 @@ async function run() {
     { concurrency: 4 }
   )
   await provider.faas.publishHttpFunctions()
-  logger.verbose(`Deploying ${numFns} FaasInstances took ${Date.now() - lastTime}ms`)
+  logger.verbose(`Deploying ${params.numFns} FaasInstances took ${Date.now() - lastTime}ms`)
   lastTime = Date.now()
 
   logger.info(fns.map(f => f.url).join('\n'))
