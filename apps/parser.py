@@ -149,13 +149,13 @@ def cdf_3d(responses):
                        linewidth=0, antialiased=False)
 	fig.savefig(filename + "_cdf_over_time" + '.jpg')
 
-
 def main():
 	data=json.loads(argv[1])
 
 	filename = data["file"]
 	file = open(filename)
-	responses = json.load(file)
+	f_data = json.load(file)
+	responses = f_data[responses]
 
 	graph = data["graph"]
 	options = data.setdefault("options", None)
