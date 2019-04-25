@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import numpy as np
+import json
 
 cold_threshold = 200
 warm_threshold = 100
@@ -19,7 +20,7 @@ warm_threshold = 100
 
 # x_axis: "tick"
 # y_axis: "latency", "cold_v_warm"
-def over_time(x_axis, y_axis, filename):
+def over_time(responses, y_axis):
 
 	if y_axis == "latency":
 		y_tmp = {}
@@ -76,14 +77,11 @@ def over_time(x_axis, y_axis, filename):
 
 		results = zip(x_time, y_total, y_cold, y_warm, y_old)
 		return results
-
+	return "valid options: latency or cold_v_warm"
+	
 # x_axis: latency
 # y_axis: percent
-def cdf(responses = None):
-	skip_graph = False
-	if resopnses:
-		skip_graph = True
-
+def cdf(responses):
 	responses = sorted(responses, key=lambda response: response.aws_latency)
 	points = len(responses)
 	y = [0]
@@ -92,44 +90,83 @@ def cdf(responses = None):
 		x.append(responses[i].aws_latency)
 		y.append(i / points)
 
-	if not skip_graph:
-		plt.plot(x, y, '-')
-		plt.xlabel('Latency (ms)', fontsize=18)
-		plt.ylabel('%% of VMs', fontsize=16)
+	plt.plot(x, y, '-')
+	plt.xlabel('Latency (ms)', fontsize=18)
+	plt.ylabel('%% of VMs', fontsize=16)
 
-		fig = plt.figure()
-		fig.savefig(filename + "_latency_CDF" + '.jpg')
+	fig = plt.figure()
+	fig.savefig(filename + "_latency_CDF" + '.jpg')
 
 	return zip(x, y)
 
-# x_axis: latency
-# y_axis: round
+def cdf_helper(responses, max_latency, points):
+	total = len(responses)
+	responses = sorted(responses, key=lambda response: response.aws_latency)
+	x = [i*max_latency/(points-1) for i in range(points)]
+	y = []
+	cur = 0
+	for latency in x:
+		while responses and responses[0].aws_latency <= latency:
+			cur += 1
+			responses.pop()
+		y.append(cur/total)
+	return y
+
+
+# y_axis: latency
+# x_axis: round
 # z_axis: percent
 # yeah this part is gonna be weird
-def cdf_3d():
-	graph_x = []
-	graph_y = []
-	graph_z = []
-
-	rounds = [[] for i in range(last_round+1)]
+def cdf_3d(responses):
+	max_latency = 0
+	last_round = 0
+	rounds = {}
 	for response in responses:
-		rounds[response.round].append(response)
+		rounds.setdefault(response.round, []).append(response)
+		max_latency = max(max_latency, response.aws_latency)
+		last_round = max(last_round, response.round)
 
-	for i in rounds:
-		for (y, z) in cdf(i):
-			graph_x.append(i)
-			graph_y.append(y)
-			graph_z.append(z)
+	x = np.linspace(0, last_round, last_round+1)
+	y = np.linspace(0, max_latency, 101)
 
+	xx, yy = np.meshgrid(x, y)
+
+
+	z = []
+	for i in range(last_round+1):
+		z.append(cdf_helper(rounds[i], max_latency, 101))
+	np.transpose(z)
 	fig = plt.figure()
 	ax = fig.gca(projection='3d')
-	surf = ax.plot_surface(graph_x, graph_y, graph_z, cmap=cm.coolwarm,
+	surf = ax.plot_surface(xx, yy, z, cmap=cm.coolwarm,
                        linewidth=0, antialiased=False)
 	fig.savefig(filename + "_cdf_over_time" + '.jpg')
 
 
 def main():
+	data=json.loads(argv[1])
 
+	filename = data["file"]
+	file = open(filename)
+	responses = json.load(file)
+
+	cold = data["cold_start"]
+	warm = data["warm_start"]
+
+	global cold_threshold
+	global warm_threshold
+	cold_threshold = cold
+	warm_threshold = warm
+
+	graph = data["graph"]
+	options = data.setdefault("options", None)
+	if graph == "3d_cdf":
+		return cdf_3d(responses)
+	if graph == "cdf":
+		return cdf(responses)
+	if graph == "line":
+		# options: "latency", "cold_v_warm"
+		return over_time(responses, options)
 
 if__name__== "__main__":
 	main()
