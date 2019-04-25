@@ -24,8 +24,8 @@ def over_time(responses, y_axis):
 		y_tmp = {}
 		last_round = 0
 		for response in responses:
-			last_round = max(last_round, response.round)
-			y_tmp.setdefault(response.round, []).append(aws_latency(response))
+			last_round = max(last_round, response['round'])
+			y_tmp.setdefault(response['round'], []).append(aws_latency(response))
 		stdev = [0 for i in range(last_round+1)]
 		y_avg = [0 for i in range(last_round+1)]
 		x_time = [0 for i in range(last_round+1)]
@@ -51,12 +51,12 @@ def over_time(responses, y_axis):
 		last_round = 0
 
 		for response in responses:
-			last_round = max(last_round, response.round)
-			y_total[response.round] += 1
-			if response.runCount > 0:
-				y_old[response.round] += 1
+			last_round = max(last_round, response['round'])
+			y_total[response['round']] += 1
+			if response["runCount"] > 0:
+				y_old[response['round']] += 1
 			else:
-				y_new[response.round] += 1
+				y_new[response['round']] += 1
 
 		x_time = [0 for i in range(last_round+1)]
 		for i in range(last_round+1):
@@ -81,14 +81,14 @@ def cdf(responses, options=None):
 	if options=="cold":
 		cold = []
 		for response in enumerate(responses):
-			if responses.runCount == 0:
+			if response['runCount'] == 0:
 				cold.append(response)
 		responses = cold
 
 	if options=="warm":
 		warm = []
 		for response in enumerate(responses):
-			if responses.runCount > 0:
+			if response['runCount'] > 0:
 				warm.append(response)
 		responses = warm
 
@@ -131,9 +131,9 @@ def cdf_3d(responses):
 	last_round = 0
 	rounds = {}
 	for response in responses:
-		rounds.setdefault(response.round, []).append(response)
+		rounds.setdefault(response['round'], []).append(response)
 		max_latency = max(max_latency, aws_latency(response))
-		last_round = max(last_round, response.round)
+		last_round = max(last_round, response['round'])
 
 	x = np.linspace(0, last_round, last_round+1)
 	y = np.linspace(0, max_latency, 101)
