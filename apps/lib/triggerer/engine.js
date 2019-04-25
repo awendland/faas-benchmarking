@@ -20,7 +20,7 @@ module.exports.HttpEngine = class HttpEngine {
     this._http = got.extend({
       retry: 0,
       followRedirect: false,
-      responseType: 'text',
+      responseType: 'json',
     })
 
     this._tick = 0
@@ -82,6 +82,8 @@ module.exports.HttpEngine = class HttpEngine {
               this.responses.push({
                 ...metadata,
                 round: this._tick,
+                window: this.windowSize,
+                size: this.requestsPerWindow,
                 aws_latency: response.body.triggeredTime - response.timings.upload,
                 initDuration: response.body.triggeredTime - response.body.initTime,
                 runCount: response.body.runCount,
