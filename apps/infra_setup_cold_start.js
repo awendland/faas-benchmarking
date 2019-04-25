@@ -51,7 +51,7 @@ async function run() {
         await sleep(1000)
         return fn
       } catch (error) {
-        logger.error({ message: `Failed to create FaaSInstance #${i}`, error })
+        logger.error({ message: `Failed to create FaasInstance #${i}`, error })
         return null
       }
     },

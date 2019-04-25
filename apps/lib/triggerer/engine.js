@@ -1,5 +1,6 @@
 const _ = require('lodash')
 const got = require('got')
+const { sleep } = require('../utils')
 
 module.exports.HttpEngine = class HttpEngine {
   /**
@@ -34,56 +35,62 @@ module.exports.HttpEngine = class HttpEngine {
 
   run() {
     this._shouldRun = true
-    this._runWindow()
+    this._loop()
+  }
+
+  async drain() {
+    this.logger.debug(`Draining all pending connections...`)
+    this._shouldRun = false
+    while (this.pendingRequests.length > 0) {
+      this.logger.debug(`${Date.now()} num_resp=${this.responses.length}\tnum_err=${this.errors.length}\tpending_req=${this.pendingRequests.length}\tlast_10: ${this.responses.slice(-10).map(r => r ? r.connectLatency : 'TT').join(" ")}`)
+      await sleep(this.windowSize)
+    }
   }
 
   stop() {
     this._shouldRun = false
-    this._cancelWindow()
     this.pendingRequests.forEach(r => r.cancel())
   }
 
-  _cancelWindow() {
-    if (this._timeoutId) {
-      clearTimeout(this._timeoutId)
-      return true
+  async _loop() {
+    let lastStart = Date.now()
+    while (this._shouldRun) {
+      const windowStart = Date.now()
+      if (windowStart - lastStart > this.windowSize * 1.1)
+        this.logger.warn(`CAN'T HIT LOAD TARGET! Took ${windowStart - lastStart}ms between ticks`)
+      lastStart = windowStart
+      this._tick++
+      this.logger.debug(`${windowStart} num_resp=${this.responses.length}\tnum_err=${this.errors.length}\tpending_req=${this.pendingRequests.length}\tlast_10: ${this.responses.slice(-10).map(r => r ? r.connectLatency : 'TT').join(" ")}`)
+
+      await this._sendRequests()
+
+      const elapsed = Date.now() - windowStart
+      const sleepMs = this.windowSize - elapsed
+      if (sleepMs < 1)
+        this.logger.warn(`CAN'T HIT LOAD TARGET! Ran ${-sleepMs}ms past request window`)
+      else
+        this.logger.debug(`Processed in ${elapsed}ms`)
+      if (this._shouldRun) await sleep(sleepMs)
     }
-    return false
   }
 
-  _scheduleWindow(sleep = 0) {
-    if (!this._timeoutId && this._shouldRun) {
-      this._timeoutId = setTimeout(() => {
-        this._timeoutId = null
-        this._runWindow()
-      }, sleep)
-      return true
-    }
-    return false
-  }
-
-  async _runWindow() {
-    const windowStart = Date.now()
-    this._tick++
-
-    this.logger.debug(`${windowStart} num_resp=${this.responses.length}\tnum_err=${this.errors.length}\tpending_req=${this.pendingRequests.length}\tlast_10: ${this.responses.slice(-10).map(r => r.totalRTT || 'TT').join(" ")}`)
-
+  async _sendRequests() {
     if (this.pendingRequests.length > this.maxOpenRequests - this.requestsPerWindow) {
       this.logger.warn(`CAN'T HIT LOAD TARGET! Too many pending requests: ${this.pendingRequests.length}`)
     } else {
       const newRequests = _.range(0, this.requestsPerWindow)
         .map((i) => {
           const url = this.requestUrls[i % this.requestUrls.length]
-          const metadata = { url, _tick: this._tick }
+          const metadata = { url, tick: this._tick }
           const request = this._http.post(url)
           request
             .then(response => {
               this.pendingRequests.splice(this.pendingRequests.indexOf(request), 1)
               this.responses.push({
                 ...metadata,
+                window: this.windowSize,
+                size: this.requestsPerWindow,
                 timings: response.timings,
-                upload_latency: response.timings.upload - response.timings.start,
-                connect_latency: response.timings.connect - response.timings.start,
                 body: response.body,
               })
             })
@@ -102,15 +109,6 @@ module.exports.HttpEngine = class HttpEngine {
 
       ;[].push.apply(this.pendingRequests, newRequests)
     }
-
-    // TODO handle if it can't send enough requests per window
-    const elapsed = Date.now() - windowStart
-    const sleep = this.windowSize - elapsed
-    if (sleep < 1)
-      this.logger.warn(`CAN'T HIT LOAD TARGET! Ran ${-sleep}ms past request window`)
-    else
-      this.logger.debug(`Processed in ${elapsed}ms`)
-    this._scheduleWindow(sleep)
   }
 
 }

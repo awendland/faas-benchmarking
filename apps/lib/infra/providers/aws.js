@@ -25,6 +25,8 @@ module.exports.AwsProvider = {
     const Tags = { 'Project': projectName }
     const faasRestGatewayStage = 'test'
 
+    // TODO use `bottleneck` for rate limiting
+
     let faasSrcBucket, faasIamRole, faasRestGateway
 
     ////////////////////
