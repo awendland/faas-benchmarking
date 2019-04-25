@@ -23,33 +23,30 @@ def calc_latency(response, method="upload_rtt_adj"):
 # timings: response.timings,
 
 # x_axis: "tick"
-# y_axis: "latency", "cold_v_warm"
-def over_time(responses, y_axis):
-    window = responses[0].window
+# y_axis: "latency", "heat"
+def over_time(responses, out_prefix, percentiles="5,95", y_axis="latency", latency="upload_rtt_adj"):
+    window = responses[0]['window']
 
     if y_axis == "latency":
         y_tmp = {}
         last_round = 0
         for response in responses:
-            last_round = max(last_round, response['round'])
-            y_tmp.setdefault(response['round'], []).append(calc_latency(response))
-        stdev = [0 for i in range(last_round+1)]
-        y_avg = [0 for i in range(last_round+1)]
-        x_time = [0 for i in range(last_round+1)]
+            last_round = max(last_round, response['tick'])
+            y_tmp.setdefault(response['tick'], []).append(calc_latency(response))
+        
+        percs = [int(s) for s in percentiles.split(",")]
+        y_percs, y_avg, x_time = [], [], []
         for i in range(last_round+1):
-            stdev[i] = np.std(y_tmp[i])
-            y_avg[i] = np.average(y_tmp[i])
-            x_time[i] = (i+1)*window
+            y_percs.append((np.percentile(y_tmp[i], percs[0]), np.percentile(y_tmp[i], percs[1])))
+            y_avg.append(np.average(y_tmp[i]))
+            x_time.append((i+1)*window)
 
-        plt.errorbar(x_time, y_avg, yerr=stdev, fmt='go')
+        plt.errorbar(x_time, y_avg, yerr=y_percs, fmt='go-')
         plt.xlabel('Time (ms)', fontsize=18)
         plt.ylabel('Latency (ms)', fontsize=16)
 
         fig = plt.figure()
-        fig.savefig(out_prefix + "_latency_time" + '.png')
-
-        results = zip(x_time, y_avg, stdev)
-        return results
+        fig.savefig(out_prefix + "_latency_line_" + latency + '.png')
 
     if y_axis == "cold_v_warm":
         y_new = [0 for i in range(last_round+1)]
@@ -58,27 +55,23 @@ def over_time(responses, y_axis):
         last_round = 0
 
         for response in responses:
-            last_round = max(last_round, response['round'])
-            y_total[response['round']] += 1
+            last_round = max(last_round, response['tick'])
+            y_total[response['tick']] += 1
             if response["runCount"] > 0:
-                y_old[response['round']] += 1
+                y_old[response['tick']] += 1
             else:
-                y_new[response['round']] += 1
+                y_new[response['tick']] += 1
 
         x_time = [0 for i in range(last_round+1)]
         for i in range(last_round+1):
             x_time[i] = (i+1)*window
 
-        plt.plot(x_time, y_total, 'k.', x_time, y_new, 'co', x_time, y_old, 'g^')
+        plt.plot(x_time, y_total, 'k.-', x_time, y_new, 'co-', x_time, y_old, 'g^-')
         plt.xlabel('Time (ms)', fontsize=18)
         plt.ylabel('# of VMs', fontsize=16)
 
-        fig = plt.figure()
-        fig.savefig(out_prefix + "_cold_v_warm" + '.png')
-
-        results = zip(x_time, y_total, y_old, y_new)
-        return results
-    return "valid options: latency or cold_v_warm"
+        plt.show()
+        plt.savefig(out_prefix + "_heat_" + latency + '.png')
 
 # x_axis: latency
 # y_axis: percent
