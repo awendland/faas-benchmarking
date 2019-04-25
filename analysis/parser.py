@@ -7,7 +7,7 @@ import sys
 #aws_latency
 
 def aws_latency(response):
-	return json.loads(response['body'])['triggeredTime'] - response['timings']['upload']
+	return response['json']['triggeredTime'] - response['timings']['upload']
 # round: this._tick,
 # window
 # size
@@ -80,15 +80,16 @@ def cdf(responses, options=None):
 
 	if options=="cold":
 		cold = []
-		for response in enumerate(responses):
-			if response['runCount'] == 0:
+		for response in responses:
+			if response['json']['runCount'] == 0:
 				cold.append(response)
 		responses = cold
 
 	if options=="warm":
+		print("HI")
 		warm = []
-		for response in enumerate(responses):
-			if response['runCount'] > 0:
+		for response in responses:
+			if response['json']['runCount'] > 0:
 				warm.append(response)
 		responses = warm
 
@@ -97,15 +98,15 @@ def cdf(responses, options=None):
 	x = [0]
 	for i in range(0, points):
 		x.append(aws_latency(responses[i]))
-		y.append(i / points)
+		y.append(float(i) / points * 100)
 
 	plt.plot(x, y, '-')
 	plt.xlabel('Latency (ms)', fontsize=18)
-	plt.ylabel('%% of VMs', fontsize=16)
+	plt.ylabel('% of VMs', fontsize=16)
+	plt.show()
+	plt.savefig(filename + "_latency_CDF_" + options + '.png')
 
-	fig = plt.figure()
-	fig.savefig(filename + "_latency_CDF" + '.png')
-
+	print(zip(x, y))
 	return zip(x, y)
 
 def cdf_helper(responses, max_latency, points):
@@ -159,6 +160,8 @@ def main():
 	file = open(filename)
 	f_data = json.load(file)
 	responses = f_data['responses']
+	for r in responses:
+		r['json'] = json.loads(r['body'])
 
 	graph = sys.argv[2]
 	options = sys.argv[3] if len(sys.argv) > 3 else None
