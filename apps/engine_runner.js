@@ -4,6 +4,7 @@ const fs = require('fs')
 const windowSize = parseInt(process.env['WINDOW']) || 500
 const requestsPerWindow = parseInt(process.env['RPW']) || 20
 const requestUrls = process.env['URLS'] ? process.env['URLS'].split(',') : ['http://alexwendland.com']
+const testDuration = parseInt(process.env['TEST_DUR']) || 10000
 
 const warm_start_engine = new HttpEngine({
   windowSize,
@@ -22,6 +23,4 @@ setTimeout(() => {
     errors: warm_start_engine.errors,
   }, null, 2)
   fs.writeFileSync(`results-${Date.now()}-w${windowSize}r${requestsPerWindow}.json`, output)
-}, 10000)
-
-//.map(r => r.timings.phases)
+}, testDuration)
