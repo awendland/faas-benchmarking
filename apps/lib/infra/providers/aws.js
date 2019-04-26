@@ -7,11 +7,12 @@ module.exports.AwsProvider = {
   create: async ({
     projectName,
     logger,
+    // Optional
     region,
     credentials,
+    existingFaasIam,
   } = {
     region: 'us-east-1',
-    credentials: undefined,
   }) => {
     aws.config.region = region
     if (credentials) aws.config.credentials
@@ -157,7 +158,7 @@ module.exports.AwsProvider = {
     }
 
     const createLambdaIAMRole = async () => {
-      const RoleName = process.env['IAM_ROLE'] || `${projectName}-faas`
+      const RoleName = existingFaasIam || `${projectName}-faas`
       try {
         const roleResp = await iam.getRole({ RoleName }).promise()
         faasIamRole = roleResp.Role.Arn

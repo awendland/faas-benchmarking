@@ -8,11 +8,13 @@ const { sleep } = require('./lib/utils')
 
 const argv = require('minimist')(process.argv.slice(2))
 
+const projectName = argv['project-name'] || process.env['PROJ_NAME'] || `test-${Date.now().toString(36)}`
 const params = {
   numFns: parseInt(argv.numfns || process.env['NUM_FNS']) || 10,
   logLevel: argv.loglevel || process.env['LOG_LEVEL'] || 'verbose',
-  projectName: argv['project-name'] || process.env['PROJ_NAME'] || `test-${Date.now().toString(36)}`,
+  projectName,
   sourceDir: argv.source || process.env['FN_SRC_DIR'] || path.join(__dirname, 'faas/'),
+  existingFaasIam: argv['faas-iam'] || process.env['FAAS_IAM'] || projectName,
 }
 
 run().catch(e => console.error(e.stack))
