@@ -13,11 +13,14 @@ const params = {
   numFns: parseInt(argv.numfns || process.env['NUM_FNS']) || 10,
   logLevel: argv.loglevel || process.env['LOG_LEVEL'] || 'verbose',
   projectName,
+  existingFaasIam: argv['faas-iam'] || process.env['FAAS_IAM'] || `${projectName}-faas`,
+  runtime: argv.runtime || process.env['RUNTIME'] || 'Node8',
+  memSize: parseInt(argv.memsize || process.env['MEM_SIZE']) || 128,
   sourceDir: argv.source || process.env['FN_SRC_DIR'] || path.join(__dirname, 'faas/'),
-  existingFaasIam: argv['faas-iam'] || process.env['FAAS_IAM'] || projectName,
+  faasTimeout: parseInt(argv.timeout || process.env['FN_TIMEOUT']) || 300,
 }
 
-run().catch(e => console.error(e.stack))
+run().catch(e => { console.error(e.stack); process.exit(1) })
 
 async function run() {
   const logger = winston.createLogger({
@@ -30,6 +33,7 @@ async function run() {
     projectName: params.projectName,
     logger: logger,
     region: 'us-east-1',
+    existingFaasIam: params.existingFaasIam,
   })
   const teardowns = []
   let lastTime = Date.now()
@@ -52,9 +56,9 @@ async function run() {
       try {
         const fn = fnFactory.build({
           name: `${params.projectName}-${i}`,
-          runtime: 'Node8',
-          size: 128,
-          timeout: 300,
+          runtime: params.runtime,
+          size: params.memSize,
+          timeout: params.faasTimeout,
         })
         teardowns.push(await fn.deploy())
         await sleep(1000)

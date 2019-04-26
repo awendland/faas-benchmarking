@@ -1,5 +1,6 @@
 const aws = require('aws-sdk')
 const archiver = require('archiver')
+const bottleneck = require('bottleneck')
 const path = require('path')
 const { sleep } = require('../../utils')
 
@@ -26,7 +27,10 @@ module.exports.AwsProvider = {
     const Tags = { 'Project': projectName }
     const faasRestGatewayStage = 'test'
 
-    // TODO use `bottleneck` for rate limiting
+    const limiter = new bottleneck({
+      minTime: 100,
+      maxConcurrent: 5,
+    })
 
     let faasSrcBucket, faasIamRole, faasRestGateway
 
@@ -85,7 +89,7 @@ module.exports.AwsProvider = {
           // Create the Lambda
           const lambdaRuntime = LAMBDA_RUNTIMES[runtime]
           logger.debug(`Creating Lambda "${name}" w/ mem=${size} timeout=${timeout} runtime=${lambdaRuntime}`)
-          const { FunctionArn } = await lambda.createFunction({
+          const { FunctionArn } = await limiter.schedule(() => lambda.createFunction({
             Code: handlerCode.location,
             FunctionName: name,
             Handler: handlerCode.handlerId,
@@ -95,7 +99,7 @@ module.exports.AwsProvider = {
             MemorySize: size,
             Publish: true,
             Tags,
-          }).promise()
+          }).promise())
           // Connect the Lambda to the API Gateway
           await addLambdaToApiGateway({ name, lambdaArn: FunctionArn })
           return {
@@ -182,10 +186,10 @@ module.exports.AwsProvider = {
     const addLambdaToApiGateway = async ({ name, lambdaArn }) => {
       // TODO add way to delete these integrations
       logger.debug(`Creating API Gateway resource at "/${name}"`)
-      const { id: apiGtwResId, path: apiGtwResPath } = await apigtw.createResource({
+      const { id: apiGtwResId, path: apiGtwResPath } = await limiter.schedule(() => apigtw.createResource({
         ...faasRestGateway,
         pathPart: name,
-      }).promise()
+      }).promise())
 
       const integrationParams = {
         restApiId: faasRestGateway.restApiId,
@@ -194,34 +198,34 @@ module.exports.AwsProvider = {
       }
 
       logger.debug(`Creating ${integrationParams.httpMethod} for "/${name}"`)
-      await apigtw.putMethod({ ...integrationParams, authorizationType: 'NONE' }).promise()
+      await limiter.schedule(() => apigtw.putMethod({ ...integrationParams, authorizationType: 'NONE' }).promise())
       logger.debug(`Linking ${integrationParams.httpMethod} "/${name}" to Lambda`)
-      await apigtw.putIntegration({
+      await limiter.schedule(() => apigtw.putIntegration({
         ...integrationParams,
         type: 'AWS_PROXY', // Handles the HTTP rewriting to Lambda format
         uri: `arn:aws:apigateway:${region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${region}:${accountId}:function:${name}/invocations`,
         integrationHttpMethod: 'POST',
-      }).promise()
+      }).promise())
       logger.debug(`Creating response for ${integrationParams.httpMethod} "/${name}"`)
-      await apigtw.putMethodResponse({
+      await limiter.schedule(() => apigtw.putMethodResponse({
         ...integrationParams,
         statusCode: '200',
         responseModels: { 'application/json': 'Empty' },
-      }).promise()
+      }).promise())
       logger.debug(`Linking Lambda response to ${integrationParams.httpMethod} "/${name}"`)
-      await apigtw.putIntegrationResponse({
+      await limiter.schedule(() => apigtw.putIntegrationResponse({
         ...integrationParams,
         statusCode: '200',
         responseTemplates: { 'application/json': '' },
-      }).promise()
+      }).promise())
       logger.debug(`Granting API Gateway permission to invoke Lambda "${name}"`)
-      await lambda.addPermission({
+      await limiter.schedule(() => lambda.addPermission({
           Action: 'lambda:InvokeFunction',
           FunctionName: lambdaArn,
           Principal: 'apigateway.amazonaws.com',
           SourceArn: `arn:aws:execute-api:${region}:${accountId}:${faasRestGateway.restApiId}/*/${integrationParams.httpMethod}${apiGtwResPath}`,
           StatementId: `api-gateway-${name}`,
-      }).promise()
+      }).promise())
     }
 
     return thiz

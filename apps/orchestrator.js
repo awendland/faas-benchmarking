@@ -1,7 +1,7 @@
 // Imports
 const fs = require('fs')
 
-run().catch(e => console.error(e.stack))
+run().catch(e => { console.error(e.stack); process.exit(1) })
 
 // Orchestrator
 async function run() {
