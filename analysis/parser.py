@@ -14,7 +14,6 @@ def calc_latency(response, method="upload_rtt_adj"):
         client_trigger_time = response['timings']['upload'] - tcp_latency
         return response['json']['triggeredTime'] - client_trigger_time
     elif method == "req_rtt":
-        print("hi")
         return response['timings']['response'] - response['timings']['upload']
 # round: this._tick,
 # window
@@ -57,9 +56,12 @@ def over_time(responses, out_prefix, percentiles="5,95", y_axis="latency", laten
         y_old = [0 for i in range(last_round+1)]
         y_total = [0 for i in range(last_round+1)]
         last_round = 0
-
+        
+        old_ids = set()
+        
         for response in responses:
             last_round = max(last_round, response['tick'])
+            old_ids.add(response['json']['id'])
             y_total[response['tick']] += 1
             if response["runCount"] > 0:
                 y_old[response['tick']] += 1
@@ -76,10 +78,13 @@ def over_time(responses, out_prefix, percentiles="5,95", y_axis="latency", laten
 
         plt.show()
         plt.savefig(out_prefix + "_heat_" + latency + '.png')
+        
+        if len(old_ids) != len(y_new):
+            print("Unique id's %d VS cold start %d" % (len(old_ids), len(y_new)))
 
 # x_axis: latency
 # y_axis: percent
-def cdf(responses, out_prefix, filter="all", latency="upload_rtt_adj"):
+def cdf(responses, out_prefix, filter="all", x_axis="latency", latency="upload_rtt_adj"):
     filtered_resp = sorted(responses, key=lambda response: calc_latency(response, method=latency))
 
     if filter=="cold":
@@ -99,6 +104,7 @@ def cdf(responses, out_prefix, filter="all", latency="upload_rtt_adj"):
     num_points = len(filtered_resp)
     x = [0]
     y = [0]
+    
     for i in range(0, num_points):
         x.append(calc_latency(filtered_resp[i], method=latency))
         y.append(float(i) / num_points * 100)
@@ -107,10 +113,35 @@ def cdf(responses, out_prefix, filter="all", latency="upload_rtt_adj"):
     plt.xlabel('Latency (ms, {})'.format(latency), fontsize=18)
     plt.ylabel('% of VMs (n={})'.format(num_points), fontsize=16)
     plt.show()
-    plt.savefig(out_prefix + "_latency_CDF_" + latency + "_" + filter + '.png')
+    plt.savefig(out_prefix + "_" + x_axis + "_CDF_" + filter + '.png')
 
     print(zip(x, y))
     return zip(x, y)
+    
+# x_axis: latency
+# y_axis: percent
+def spawn_cdf(responses, out_prefix):
+    filtered_resp = []
+    for response in responses:
+        if response['json']['runCount'] == 1:
+            filtered_resp.append(response)
+
+    sorted_spawn = sorted(filtered_resp, key=lambda response: response['json']['initTime'])
+    x_req = sorted(map(lambda r: r['timings']['upload'], filtered_resp))
+    num_points = len(filtered_resp)
+    x_spawn = []
+    y = []
+    
+    for i in range(0, num_points):
+        x_spawn.append(sorted_spawn[i]['json']['initTime'])
+        y.append(float(i) / num_points * 100)
+    plt.plot(x_spawn, y, '-', x_req, y, '--')
+    plt.xlabel('Time')
+    plt.ylabel('% of VMs (n={})'.format(num_points), fontsize=16)
+    plt.show()
+    plt.savefig(out_prefix + "_spawn_request_CDF_" + '.png')
+
+    return zip(x_req, x_spawn)
 
 def cdf_helper(responses, max_latency, points):
     total = len(responses)
@@ -159,7 +190,7 @@ if __name__== "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("data_file", help="file containing response data to load")
     parser.add_argument("graph_type", help="which type of graph to generate",
-                        choices=["cdf", "3d_cdf", "line"])
+                        choices=["cdf", "3d_cdf", "line", "spawn_cdf"])
     args, extra_args_raw = parser.parse_known_args()
     with open(args.data_file, 'r') as data_file:
         data = json.load(data_file)
@@ -180,3 +211,5 @@ if __name__== "__main__":
     if args.graph_type == "line":
         # options: "latency", "cold_v_warm"
         over_time(responses, out_prefix, **extra_args)
+    if args.graph_type == "spawn_cdf":
+        spawn_cdf(responses, out_prefix, **extra_args)

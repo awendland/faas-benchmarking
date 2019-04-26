@@ -198,20 +198,9 @@ module.exports.AwsProvider = {
       logger.debug(`Linking ${integrationParams.httpMethod} "/${name}" to Lambda`)
       await apigtw.putIntegration({
         ...integrationParams,
-        type: 'AWS_PROXY',
+        type: 'AWS_PROXY', // Handles the HTTP rewriting to Lambda format
         uri: `arn:aws:apigateway:${region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${region}:${accountId}:function:${name}/invocations`,
         integrationHttpMethod: 'POST',
-        // requestTemplates: {
-        //   'application/json': `{
-  // "body" : $input.json('$'),
-  // "headers": {
-    // #foreach($param in $input.params().header.keySet())
-    // "$param": "$util.escapeJavaScript($input.params().header.get($param))" #if($foreach.hasNext),#end
-    
-    // #end  
-  // }
-// }`,
-        // },
       }).promise()
       logger.debug(`Creating response for ${integrationParams.httpMethod} "/${name}"`)
       await apigtw.putMethodResponse({
