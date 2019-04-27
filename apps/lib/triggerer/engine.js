@@ -5,9 +5,9 @@ const { sleep } = require('../utils')
 module.exports.HttpEngine = class HttpEngine {
   /**
    * @param opts.windowSize - Number of milliseconds between batches of requests
-   * @param opts.requestsPerWindow - How many requests to create during each batch
-   * @param opts.requestsGrowthRate - How many more requests to make in each subsequent window.
-   *                                  Supports linear growth of request rate. Defaults to 0.
+   * @param opts.requestsPerWindow - How many requests to create during each batch. This can be
+   *                                 a single value, or an array, which will be selected from
+   *                                 in a round-robin style.
    * @param opts.requestUrls - Chosen in a round-robin fashion by each request in a batch
    * @param opts.requestPayloads - CURRENTLY UNUSED
    * @param opts.logger - Logger to use for reporting info (will default to noop)
@@ -19,6 +19,7 @@ module.exports.HttpEngine = class HttpEngine {
     logger: { error: () => undefined, info: () => undefined, debug: () => undefined },
     maxOpenRequests: 1024,
   }) {
+    opts.requestsPerWindow = [].concat(opts.requestsPerWindow)
     Object.assign(this, opts)
 
     this._http = got.extend({
@@ -53,7 +54,7 @@ module.exports.HttpEngine = class HttpEngine {
     this.logger.debug(`Draining all pending connections...`)
     this._shouldRun = false
     while (this.pendingRequests.length > 0) {
-      this.logger.debug(`${Date.now()} num_resp=${this.responses.length}\tnum_err=${this.errors.length}\tpending_req=${this.pendingRequests.length}\tlast_10: ${this.responses.slice(-10).map(r => r ? r.connectLatency : 'TT').join(" ")}`)
+      this._printStatus()
       await sleep(this.windowSize)
     }
     return this
@@ -67,6 +68,15 @@ module.exports.HttpEngine = class HttpEngine {
     this.pendingRequests.forEach(r => r.cancel())
     return this
   }
+  
+  _printStatus(windowStart=Date.now()) {
+    this.logger.debug(`[${windowStart}]`
+                    + `\tnew_req=${this._shouldRun ? `${this._numRequestsThisTick()}` : `draining`}`
+                    + `\tnum_resp=${this.responses.length}`
+                    + `\tnum_err=${this.errors.length}`
+                    + `\tpending_req=${this.pendingRequests.length}`
+                    + `\tlast_10: ${this.responses.slice(-10).map(r => (r && r.timings) ? r.timings.phases.total : 'TT').join(' ')}`)
+  }
 
   async _loop() {
     let lastStart = Date.now()
@@ -75,11 +85,7 @@ module.exports.HttpEngine = class HttpEngine {
       if (windowStart - lastStart > this.windowSize * 1.1)
         this.logger.warn(`CAN'T HIT LOAD TARGET! Took ${windowStart - lastStart}ms between ticks`)
       lastStart = windowStart
-      this.logger.debug(`[${windowStart}] new_req=${this._numRequestsThisTick()}`
-                      + `\tnum_resp=${this.responses.length}`
-                      + `\tnum_err=${this.errors.length}`
-                      + `\tpending_req=${this.pendingRequests.length}`
-                      + `\tlast_10: ${this.responses.slice(-10).map(r => (r && r.timings) ? r.timings.phases.total : 'TT').join(' ')}`)
+      this._printStatus(windowStart)
 
       await this._sendRequests()
       this._tick++
@@ -95,7 +101,7 @@ module.exports.HttpEngine = class HttpEngine {
   }
 
   _numRequestsThisTick() {
-    return this.requestsPerWindow + this.requestsGrowthRate * this._tick
+    return this.requestsPerWindow[this._tick % this.requestsPerWindow.length]
   }
 
   async _sendRequests() {

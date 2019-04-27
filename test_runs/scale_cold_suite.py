@@ -33,7 +33,7 @@ if __name__== "__main__":
             urls = utils.fetch_checkpoint_or_run(proj_name, init_urls)
             for rpw, url in zip(BURSTS, urls):
                 utils.send_requests(filename='{}-b{}.results'.format(proj_name, rpw),
-                                    rpw=rpw,
+                                    rpws=[rpw],
                                     window=10000,
                                     duration=500,
                                     urls=[url])

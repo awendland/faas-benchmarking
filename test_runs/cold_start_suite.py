@@ -32,7 +32,7 @@ if __name__== "__main__":
                                          num_fns=NUM_TRIALS)
             urls = utils.fetch_checkpoint_or_run(proj_name, init_urls)
             utils.send_requests(filename=proj_name + '.results',
-                                rpw=NUM_TRIALS,
+                                rpws=[NUM_TRIALS],
                                 window=10000,
                                 duration=500,
                                 urls=urls)

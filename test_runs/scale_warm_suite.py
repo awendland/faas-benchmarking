@@ -16,9 +16,7 @@ from pathlib import Path
 #   | parallel -j1 'aws apigateway delete-rest-api --rest-api-id {}; echo {}; sleep 60'
 
 MEM_SIZES = [128, 256, 512, 1024, 2048] # Taken from the GCP list and within AWS bounds
-NUM_BURSTS = 13
-BURST_START = 100
-BURST_GROWTH = 100
+BURSTS = [50 * i for i in range(1, 14*2+1)]
 RUNTIMES = ['Node8']
 
 if __name__== "__main__":
@@ -33,10 +31,9 @@ if __name__== "__main__":
                                          runtime=runtime,
                                          num_fns=1)
             urls = utils.fetch_checkpoint_or_run(proj_name, init_urls)
-            window = 500
+            window = 1000
             utils.send_requests(filename='{}.results'.format(proj_name),
-                                rpw=BURST_START,
-                                req_growth=BURST_GROWTH,
+                                rpws=BURSTS,
                                 window=window,
-                                duration=NUM_BURSTS * window + (window * 0.5),
+                                duration=len(BURSTS) * window + (window * 0.5),
                                 urls=urls)

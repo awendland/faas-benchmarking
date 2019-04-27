@@ -34,7 +34,7 @@ if __name__== "__main__":
             window = 500 # ms
             rpw = 200 # ms
             utils.send_requests(filename=proj_name + '.results',
-                                rpw=rpw,
+                                rpws=[rpw],
                                 window=window,
                                 # One extra request in the beginning + half a window at the
                                 # end to make sure any delays don't screw things up

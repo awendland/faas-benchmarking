@@ -63,18 +63,17 @@ def setup_infra(proj_name=None, num_fns=None, runtime=None, mem_size=None, debug
     sleep(10) # Allow lambdas to get propagated
     return urls
 
-def send_requests(filename=None, rpw=None, req_growth=0, window=None, duration=None, urls=None):
+def send_requests(filename=None, rpws=None, window=None, duration=None, urls=None):
     """
     Trigger HTTP requests against the FaaS endpoints and write the results to a
     file.
     """
-    if not filename or not rpw or not window or not duration or not urls:
+    if not filename or not rpws or not window or not duration or not urls:
         raise Exception('missing param')
     engine_script = Path(__file__).parent.joinpath('..', 'apps', 'engine_runner.js')
     cmd = ['node', str(engine_script),
            '--window-size', str(window),
-           '--rpw', str(rpw),
-           '--req-growth', str(req_growth),
+           '--rpw', ','.join(map(str, rpws)),
            '--duration', str(duration),
            '--out', filename,
            '--urls', ','.join(urls)]
