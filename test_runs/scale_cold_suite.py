@@ -15,24 +15,25 @@ from pathlib import Path
 #   | awk '{print $2}'
 #   | parallel -j1 'aws apigateway delete-rest-api --rest-api-id {}; echo {}; sleep 60'
 
-NUM_TRIALS = 100
 MEM_SIZES = [128, 256, 512, 1024, 2048] # Taken from the GCP list and within AWS bounds
+BURSTS = [100 * i for i in range(1, 14+1)]
 RUNTIMES = ['Node8']
 
 if __name__== "__main__":
     run_id = os.getenv('RUN_ID', utils.run_id())
     for runtime in RUNTIMES:
         for mem_size in MEM_SIZES:
-            proj_name = 'cold-start-{}-{}-{}'.format(run_id, mem_size, runtime).lower()
+            proj_name = 'scale-cold-{}-{}-{}'.format(run_id, mem_size, runtime).lower()
             print('\n[{}]'.format(proj_name))
             def init_urls():
                 return utils.setup_infra(proj_name=proj_name,
                                          mem_size=mem_size,
                                          runtime=runtime,
-                                         num_fns=NUM_TRIALS)
+                                         num_fns=len(BURSTS))
             urls = utils.fetch_checkpoint_or_run(proj_name, init_urls)
-            utils.send_requests(filename=proj_name + '.results',
-                                rpw=NUM_TRIALS,
-                                window=10000,
-                                duration=500,
-                                urls=urls)
+            for rpw, url in zip(BURSTS, urls):
+                utils.send_requests(filename='{}-b{}.results'.format(proj_name, rpw),
+                                    rpw=rpw,
+                                    window=10000,
+                                    duration=500,
+                                    urls=[url])

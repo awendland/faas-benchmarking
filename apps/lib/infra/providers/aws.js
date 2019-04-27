@@ -174,7 +174,7 @@ module.exports.AwsProvider = {
           RoleName,
         }).promise()
         await iam.attachRolePolicy({
-           PolicyArn: 'arn:aws:iam::aws:policy/service-role/AWSLambdaRole',
+           PolicyArn: 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole',
            RoleName,
         }).promise()
         faasIamRole = createRoleResp.Role.Arn

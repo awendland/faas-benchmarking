@@ -61,7 +61,6 @@ async function run() {
           timeout: params.faasTimeout,
         })
         teardowns.push(await fn.deploy())
-        await sleep(1000)
         return fn
       } catch (error) {
         logger.error({ message: `Failed to create FaasInstance #${i}`, error })

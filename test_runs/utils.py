@@ -1,6 +1,7 @@
 from subprocess import Popen, PIPE, STDOUT
 from pathlib import Path
 from datetime import datetime, timedelta
+from time import sleep
 import json
 
 def run_id():
@@ -58,6 +59,8 @@ def setup_infra(proj_name=None, num_fns=None, runtime=None, mem_size=None, debug
            '--faas-iam', iam]
     output = run_cmd_or_throw(cmd, buffer=True, print_to_stdout=True)
     urls = list(filter(lambda l: 'execute-api' in l, output))
+    urls = [u.replace('info: ', '') for u in urls]
+    sleep(10) # Allow lambdas to get propagated
     return urls
 
 def send_requests(filename=None, rpw=None, window=None, duration=None, urls=None):
