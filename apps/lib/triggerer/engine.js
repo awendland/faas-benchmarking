@@ -1,5 +1,7 @@
 const _ = require('lodash')
 const got = require('got')
+const https = require('https')
+const url = require('url')
 const { sleep } = require('../utils')
 
 module.exports.HttpEngine = class HttpEngine {
@@ -21,8 +23,16 @@ module.exports.HttpEngine = class HttpEngine {
   }) {
     opts.requestsPerWindow = [].concat(opts.requestsPerWindow)
     Object.assign(this, opts)
+    
+    this.agent = new https.Agent({
+      keepAlive: true,
+      maxCachedSessions: this.maxOpenRequests,
+      maxFreeSockets: this.maxOpenRequests,
+      maxSockets: this.maxOpenRequests,
+    })
 
     this._http = got.extend({
+      agent: this.agent,
       retry: 0,
       followRedirect: false,
       responseType: 'text',
@@ -42,7 +52,7 @@ module.exports.HttpEngine = class HttpEngine {
    */
   run() {
     this._shouldRun = true
-    this._loop()
+    this._setupConnections().then(() => this._loop())
     return this
   }
 
@@ -55,7 +65,7 @@ module.exports.HttpEngine = class HttpEngine {
     this._shouldRun = false
     while (this.pendingRequests.length > 0) {
       this._printStatus()
-      await sleep(this.windowSize)
+      await sleep(500)
     }
     return this
   }
@@ -67,6 +77,18 @@ module.exports.HttpEngine = class HttpEngine {
     this._shouldRun = false
     this.pendingRequests.forEach(r => r.cancel())
     return this
+  }
+  
+  async _setupConnections() {
+    const connections = []
+    for (let i = 0; i < this.maxOpenRequests; ++i) {
+      const { host, port } = url.parse(this.requestUrls[i % this.requestUrls.length])
+      connections.push(new Promise((res) => {
+        this.agent.createConnection({ host, port }, res)
+      }))
+    }
+    await connections
+    this.logger.debug(`Prepared ${Object.keys(this.agent.freeSockets)} free sockets`)
   }
   
   _printStatus(windowStart=Date.now()) {

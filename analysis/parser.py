@@ -6,21 +6,7 @@ import sys
 import os
 import argparse
 
-#aws_latency
-
-def calc_latency(response, method="upload_rtt_adj"):
-    if method == "upload_rtt_adj":
-        tcp_latency = response['timings']['phases']['tcp'] / 2
-        client_trigger_time = response['timings']['upload'] - tcp_latency
-        return response['json']['triggeredTime'] - client_trigger_time
-    elif method == "req_rtt":
-        return response['timings']['response'] - response['timings']['upload']
-# round: this._tick,
-# window
-# size
-# url: url,
-# body: response.body,
-# timings: response.timings,
+from shared import *
 
 # x_axis: "tick"
 # y_axis: "latency", "heat"
