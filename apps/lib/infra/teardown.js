@@ -4,15 +4,14 @@
  * then all the errors will be flatMapped and thrown
  * at the top level.
  */
-module.exports.handleTeardowns = async (teardowns) => {
-  failed = []
-  teardowns.forEach(t => {
+module.exports.handleTeardowns = async teardowns => {
+  const failed = []
+  await teardowns.forEach(async t => {
     try {
       await t.teardown()
-    } catch(e) {
+    } catch (e) {
       failed = failed.concat(e)
     }
   })
-  if (failed.length > 0)
-    throw failed
+  if (failed.length > 0) throw failed
 }

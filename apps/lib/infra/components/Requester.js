@@ -1,7 +1,7 @@
 const got = require('got')
 
 class HttpTriggerer {
-  constructor(provider, {size, libVersion}) {
+  constructor(provider, { size, libVersion }) {
     this.provider = provider
     this.size = size
     this.libVersion = libVersion
@@ -26,15 +26,14 @@ class HttpTriggerer {
   }
 
   async teardown() {
-    if (this.vm)
-      await this.provider.destroyVM(vm.id)
+    if (this.vm) await this.provider.destroyVM(vm.id)
   }
 
   async isReachable() {
     try {
       await got.get(`http://${this.vm.publicDNS}/health`)
       return true
-    } catch(e) {
+    } catch (e) {
       return false
     }
   }

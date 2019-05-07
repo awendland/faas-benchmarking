@@ -43,9 +43,11 @@ async function run() {
   })
 
   app.postAsync('/shutdown', async (req, res) => {
-    res.send(JSON.stringify({msg: 'Shutting down'}))
+    res.send(JSON.stringify({ msg: 'Shutting down' }))
     await server.close()
   })
 
-  const server = await app.listen(port, () => console.log(`Control server on port ${port}!`))
+  const server = await app.listen(port, () =>
+    console.log(`Control server on port ${port}!`)
+  )
 }

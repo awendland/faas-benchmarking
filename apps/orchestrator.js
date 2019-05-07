@@ -1,7 +1,10 @@
 // Imports
 const fs = require('fs')
 
-run().catch(e => { console.error(e.stack); process.exit(1) })
+run().catch(e => {
+  console.error(e.stack)
+  process.exit(1)
+})
 
 // Orchestrator
 async function run() {
@@ -10,13 +13,15 @@ async function run() {
 
   try {
     const triggerer = new HttpTriggerer(provider, {
-      size: "", // TODO probably based on # of RPS needed
-      libVersion: "",
+      size: '', // TODO probably based on # of RPS needed
+      libVersion: '',
     })
     teardowns.push(await triggerer.deploy())
     // TODO check that Triggerer is reachable
-    if (!await triggerer.isReachable()) {
-      logger.error(`Unable to connect to Requester at "${triggerer.vm.publicDNS}"`)
+    if (!(await triggerer.isReachable())) {
+      logger.error(
+        `Unable to connect to Requester at "${triggerer.vm.publicDNS}"`
+      )
       return
     }
 
@@ -26,7 +31,7 @@ async function run() {
       benchmark = require(`./benchmarks/${BENCHMARK_MODE}`)({
         logger: logger,
       })
-    } catch(e) {
+    } catch (e) {
       logger.error(`Unable to load ${BENCHMARK_MODE}`, e)
       return
     }

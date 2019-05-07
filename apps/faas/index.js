@@ -1,10 +1,14 @@
 const initTime = Date.now()
 let runCount = 0
-const id = require('crypto').randomBytes(16).toString('base64')
+const id = require('crypto')
+  .randomBytes(16)
+  .toString('base64')
 
 module.exports.handler = async (event, context) => {
   const triggeredTime = Date.now()
-  console.log(`run_count=${runCount++} init_time=${initTime} triggered_time=${triggeredTime}`)
+  console.log(
+    `run_count=${runCount++} init_time=${initTime} triggered_time=${triggeredTime}`
+  )
   return {
     statusCode: 200,
     headers: {

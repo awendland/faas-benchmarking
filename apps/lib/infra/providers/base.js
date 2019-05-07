@@ -8,5 +8,5 @@ module.exports.FunctionSize = {
 }
 
 module.exports.FunctionRuntimes = {
-  'Node8': 'Node8',
+  Node8: 'Node8',
 }

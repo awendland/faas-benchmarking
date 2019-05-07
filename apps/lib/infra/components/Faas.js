@@ -28,8 +28,7 @@ module.exports.FaasInstance = class FaasInstance {
    * Removes any infrastructure created for this FaasInstance.
    */
   async teardown() {
-    if (this.url)
-      this.provider.deleteFunction(this.name)
+    if (this.url) this.provider.deleteFunction(this.name)
     return this
   }
 }
@@ -48,20 +47,26 @@ module.exports.FaasFactory = class FaasFactory {
    *
    * In the case of AWS, this will upload the source code to S3 for Lambdas to be based on.
    */
-  static async setup(provider, { name, sourceDir, handlerId } = { handlerId: 'index.handler' }) {
-    const handlerCode = await provider.faas.prepareHandlerCode(name, sourceDir, handlerId)
+  static async setup(
+    provider,
+    { name, sourceDir, handlerId } = { handlerId: 'index.handler' }
+  ) {
+    const handlerCode = await provider.faas.prepareHandlerCode(
+      name,
+      sourceDir,
+      handlerId
+    )
     return new FaasFactory({ provider, handlerCode })
   }
 
-  /** 
+  /**
    * Create a new FaasInstance. This instance will need to be deployed by calling `deploy` on it.
    */
   build(functionParams) {
-    return new module.exports.FaasInstance(this.provider,
-      {
-        ...functionParams,
-        handlerCode: this.handlerCode
-      })
+    return new module.exports.FaasInstance(this.provider, {
+      ...functionParams,
+      handlerCode: this.handlerCode,
+    })
   }
 
   /**
