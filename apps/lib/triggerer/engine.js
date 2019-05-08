@@ -96,10 +96,10 @@ module.exports.HttpEngine = class HttpEngine {
     const statusId = setInterval(() => {
       this.logger.debug(this.agent.getCurrentStatus())
     }, 5000)
-    await Promise.all(
+    const nullsOrErrors = await Promise.all(
       _.range(this._maxRequestsPerWindow()).map(
         i =>
-          new Promise((res, rej) => {
+          new Promise((resolve, reject) => {
             let { host, port } = url.parse(
               this.requestUrls[i % this.requestUrls.length]
             )
@@ -108,17 +108,23 @@ module.exports.HttpEngine = class HttpEngine {
               host,
               port,
               agent: this.agent,
+              method: 'HEAD',
             }
             // TODO pre-warm TCP connection only, don't make full HTTP request
-            const client = https.get(reqOptions, () => client.abort()) // Free socket back up
-            client.on('error', err => rej(err))
-            client.on('abort', () => res())
+            const req = https.request(reqOptions, res => {
+              res.resume()
+              res.on('end', () => resolve())
+            })
+            req.on('error', err => resolve(err))
+            req.end()
           })
       )
     )
+    nullsOrErrors.filter(e => !!e).forEach(e => this.logger.debug(e))
     clearInterval(statusId)
     this.logger.debug(
-      `Prepared ${this.agent.getCurrentStatus().createSocketCount} sockets`
+      `Prepared free sockets:`,
+      this.agent.getCurrentStatus().freeSockets
     )
   }
 
