@@ -32,6 +32,9 @@ def load_data_files(files):
                 print('{} error responses'.format(len(data['errors'])))
             responses = data['responses']
             for r in responses:
-                r['json'] = json.loads(r['body'])
+                try:
+                    r['json'] = json.loads(r['body'])
+                except json.JSONDecodeError:
+                    r['json'] = {}
             data_files.append(responses)
     return data_files
