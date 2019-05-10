@@ -49,12 +49,12 @@ module.exports.FaasFactory = class FaasFactory {
    */
   static async setup(
     provider,
-    { name, sourceDir, handlerId } = { handlerId: 'index.handler' }
+    { name, sourceDir, handlerId } = { handlerId: 'index.handler' },
   ) {
     const handlerCode = await provider.faas.prepareHandlerCode(
       name,
       sourceDir,
-      handlerId
+      handlerId,
     )
     return new FaasFactory({ provider, handlerCode })
   }

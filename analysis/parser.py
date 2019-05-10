@@ -1,10 +1,9 @@
+import altair as alt
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import numpy as np
-import json
-import sys
-import os
-import argparse
+import pandas as pd
+import json, sys, os, argparse, re
 
 from shared import *
 
@@ -49,7 +48,7 @@ def over_time(responses, out_prefix, percentiles="5,95", y_axis="latency", laten
             last_round = max(last_round, response['tick'])
             old_ids.add(response['json']['id'])
             y_total[response['tick']] += 1
-            if response["runCount"] > 0:
+            if response["runCount"] > 1:
                 y_old[response['tick']] += 1
             else:
                 y_new[response['tick']] += 1
@@ -70,39 +69,72 @@ def over_time(responses, out_prefix, percentiles="5,95", y_axis="latency", laten
 
 # x_axis: latency
 # y_axis: percent
-def cdf(responses, out_prefix, filter="all", x_axis="latency", latency="upload_rtt_adj"):
-    filtered_resp = sorted(responses, key=lambda response: calc_latency(response, method=latency))
+def cdf(data_files, out_prefix, filter="all", latency="req_rtt", test_type="Cold"):
+    data_files.sort(key=lambda d: d[0]['size'])
+    fig = plt.figure(figsize=(10,5))
+    ax = plt.subplot(111)
+    memory = re.search('[0-9a-f]+-(\d+)-[a-z]+[a-z0-9]*-\d+$', data_files[0][0]['json']['functionName']).group(1)
+    burst_color = cm.get_cmap('nipy_spectral', len(data_files))
+    vm_set = set()
+    filtered_set = set()
+    df = pd.DataFrame()
+    for idx,responses in enumerate(data_files):
+        for r in responses:
+            vm_set.add(r['json']['id'])
+        if filter=="cold":
+            resp = []
+            for response in responses:
+                if response['json']['runCount'] == 1:
+                    resp.append(response)
+            filtered_resp = resp
+        elif filter=="warm":
+            resp = []
+            for response in responses:
+                if response['json']['runCount'] > 1:
+                    resp.append(response)
+            filtered_resp = resp
+            print("warm responses: " + str(len(filtered_resp)))
+            for r in filtered_resp:
+                filtered_set.add(r['json']['id'])
+        else:
+            filtered_resp = responses
 
-    if filter=="cold":
-        resp = []
-        for response in filtered_resp:
-            if response['json']['runCount'] == 1:
-                resp.append(response)
-        filtered_resp = resp
+        filtered_resp = sorted(map(lambda r: (calc_latency(r, method=latency)), responses))
 
-    if filter=="warm":
-        resp = []
-        for response in filtered_resp:
-            if response['json']['runCount'] > 1:
-                resp.append(response)
-        filtered_resp = resp
+        num_points = len(filtered_resp)
+        x, y = [0], [0]
 
-    num_points = len(filtered_resp)
-    x = [0]
-    y = [0]
+        for i in range(0, num_points):
+            x.append(filtered_resp[i])
+            y.append(float(i) / num_points * 100)
+            
+        df['Latency (ms, {})'.format(latency)], df['% of Requests'] = x, y
+
+        ax.plot(x, y,
+                '-' if idx % 2 == 0 else '--',
+                label='{} reqs (n={})'.format(responses[0]['size'], len(responses)),
+                color=burst_color(idx))
+
+    title = test_type + ' Start Latency with Varying Request Sizes ({}MB)'.format(memory)
+    chart = alt.Chart(df).mark_line().encode(
+        x='Latency (ms, {})'.format(latency),
+        y='% of Requests',
+    ).configure(
+        background='white'
+    ).properties(
+        title=title
+    )
+    chart.save('chart.png')
     
-    for i in range(0, num_points):
-        x.append(calc_latency(filtered_resp[i], method=latency))
-        y.append(float(i) / num_points * 100)
-
-    plt.plot(x, y, '-')
-    plt.xlabel('Latency (ms, {})'.format(latency), fontsize=18)
-    plt.ylabel('% of VMs (n={})'.format(num_points), fontsize=16)
+    plt.xlabel('Latency (ms, {})'.format(latency))
+    plt.ylabel('% of Requests')
+    
+    plt.title(title)
+    ax.legend()
     plt.show()
-    plt.savefig(out_prefix + "_" + x_axis + "_CDF_" + filter + '.png')
+    plt.savefig(out_prefix + "_CDF_" + filter + '.png')
 
-    print(zip(x, y))
-    return zip(x, y)
+    #return zip(x, y)
     
 # x_axis: latency
 # y_axis: percent
@@ -171,31 +203,133 @@ def cdf_3d(responses, out_prefix):
     surf = ax.plot_surface(xx, yy, z, cmap=cm.coolwarm,
                        linewidth=0, antialiased=False)
     fig.savefig(out_prefix + "_cdf_over_time" + '.jpg')
+    
+def l_cnt(data_files, out_prefix, filter="all"):
+    memory = [128,256,512,1024,2048]
+    burst_size = [x * 100 for x in range(1,11)]
+    fig = plt.figure(figsize=(10,5))
+    ax = plt.subplot(111)
+    
+    for x in range(5):
+        num_lambdas = []
+        for y in range(10):
+            print (y, data_files[y])
+            id_list = set([r['json']['id'] for r in data_files[y]])
+            num_lambdas.append(len(id_list))
+        data_files = data_files[10:]
+        ax.plot(burst_size, num_lambdas, '-', label='{} MB'.format(memory[x]))
+    
+    plt.plot(burst_size, num_lambdas, '-')
+    plt.xlabel('Burst Size', fontsize=16)
+    plt.ylabel('Unique Lambdas', fontsize=16)
+    plt.title('# of Unique Lambdas That Respond Per Burst')
+    ax.legend()
+    plt.show()
+    plt.savefig('CNT_' + out_prefix + "_" + "_CDF_" + filter + '.png')
+    
+def cold_per_burst(data_file, out_prefix, x_axis="Burst Size", filter="all"):
+    #memory = [128,256,512,1024,2048]
+    added_burst = [50 for i in range(14*2)]
+    fig = plt.figure(figsize=(10,5))
+    ax = plt.subplot(111)
+    
+    data_file = sorted(data_file, key=lambda r: r['tick'], reverse=True)
+    ticks = []
+    warm_count = []
+    new_vm_count = []
+    all_vm_count = []
+    reqs = []
+    
+    cur_tick = 0
+    
+    while data_file:
+        counter = 0
+        pre_warms = 0
+        true_cold = 0
+        clock = 0
+        vm_set = set()
+
+        while data_file and cur_tick == data_file[-1]['tick']:
+            cur_req = data_file.pop()
+            counter += 1
+            vm_set.add(cur_req['json']['id'])
+            if cur_req['json']['runCount'] == 1:
+                if cur_req['json']['triggeredTime'] - cur_req['json']['initTime'] > calc_latency(cur_req):
+                    pre_warms += 1
+                    print((cur_req['json']['triggeredTime'] - cur_req['json']['initTime'], calc_latency(cur_req)))
+                else:
+                    true_cold += 1
+
+        reqs.append(counter)
+        warm_count.append(pre_warms)
+        new_vm_count.append(pre_warms + true_cold)
+        all_vm_count.append(len(vm_set))
+        ticks.append(cur_tick)
+        cur_tick += 1
+    
+    print(reqs)
+    
+    ax.plot(ticks, new_vm_count, '^-', label='new VMs this round')
+    ax.plot(ticks, warm_count, 'o-', label='pre-warmed VMs (cold latency < VM lifetime)')
+    ax.plot(ticks, all_vm_count, 'v-', label='total VMs seen this round')
+    ax.plot(ticks, reqs, 's-', label='total requests sent')
+
+    plt.xlabel('Time', fontsize=16)
+    plt.ylabel('# of Requests', fontsize=16)
+    plt.title('New requests per burst')
+    ax.legend()
+    plt.show()
+    plt.savefig('WW'+ "_CDF" + '.png')
+
+def l_cnt_warm(data_file, out_prefix, x_axis="Burst Size", filter="all"):
+    #memory = [128,256,512,1024,2048]
+    burst_size = [50 * i for i in range(1, 14*2+1)]
+    cum_reqs = [sum(burst_size[:x+1]) for x in range(len(burst_size))]
+
+    fig = plt.figure(figsize=(10,5))
+    ax = plt.subplot(111)
+    
+    num_lambdas = []
+    for burst in burst_size:
+        id_list = set([r['json']['id'] for r in data_file[:burst]])
+        num_lambdas.append(len(id_list))
+        datafile = data_file[:burst]
+    print (num_lambdas)
+    ax.plot(burst_size, num_lambdas, '-', label='# of unique lambdas')
+    #ax.plot(burst_size, cum_reqs, '-', label='Cumulative Requests Sent')
+
+    plt.xlabel('Burst Size', fontsize=16)
+    plt.ylabel('Unique VMs', fontsize=16)
+    plt.title('Scaling Bursts for One Function')
+    ax.legend()
+    plt.show()
+    plt.savefig('CNT_' + out_prefix + "_" + x_axis + "_CDF_" + filter + '.png')
 
 if __name__== "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("data_file", help="file containing response data to load")
     parser.add_argument("graph_type", help="which type of graph to generate",
-                        choices=["cdf", "3d_cdf", "line", "spawn_cdf"])
+                        choices=["cdf", "3d_cdf", "line", "spawn_cdf", "l_cnt", "l_cnt_warm", "cpb"])
     args, extra_args_raw = parser.parse_known_args()
-    with open(args.data_file, 'r') as data_file:
-        data = json.load(data_file)
-        if data['errors']:
-            print('{} error responses'.format(len(data['errors'])))
-        responses = data['responses']
-        for r in responses:
-            r['json'] = json.loads(r['body'])
+    
+    data_files = load_data_files(args.data_file.split(","))
 
     extra_args = {s.split("=")[0].replace("--", ""): s.split("=")[1] for s in extra_args_raw}
 
     out_prefix = os.path.splitext(os.path.basename(args.data_file))[0]
 
     if args.graph_type == "3d_cdf":
-        cdf_3d(responses, out_prefix)
+        cdf_3d(data_files[0], out_prefix)
     if args.graph_type == "cdf":
-        cdf(responses, out_prefix, **extra_args)
+        cdf(data_files, out_prefix, **extra_args)
     if args.graph_type == "line":
         # options: "latency", "cold_v_warm"
-        over_time(responses, out_prefix, **extra_args)
+        over_time(data_files[0], out_prefix, **extra_args)
     if args.graph_type == "spawn_cdf":
-        spawn_cdf(responses, out_prefix, **extra_args)
+        spawn_cdf(data_files[0], out_prefix, **extra_args)
+    if args.graph_type == "l_cnt":
+        l_cnt(data_files, out_prefix, **extra_args)
+    if args.graph_type == "l_cnt_warm":
+        l_cnt_warm(data_files[0], out_prefix, **extra_args)
+    if args.graph_type == "cpb":
+        cold_per_burst(data_files[0], out_prefix, **extra_args)

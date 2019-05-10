@@ -48,6 +48,6 @@ async function run() {
   })
 
   const server = await app.listen(port, () =>
-    console.log(`Control server on port ${port}!`)
+    console.log(`Control server on port ${port}!`),
   )
 }

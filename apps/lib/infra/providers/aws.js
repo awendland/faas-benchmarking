@@ -64,15 +64,15 @@ module.exports.AwsProvider = {
           if (!faasSrcBucket) {
             faasSrcBucket = `${projectName}-faas-src`
             logger.debug(
-              `Creating new FaaS source bucket called "${faasSrcBucket}"`
+              `Creating new FaaS source bucket called "${faasSrcBucket}"`,
             )
             await s3.createBucket({ Bucket: faasSrcBucket }).promise()
             logger.debug(
-              `Finished creating FaaS source bucket called "${faasSrcBucket}"`
+              `Finished creating FaaS source bucket called "${faasSrcBucket}"`,
             )
           }
           logger.debug(
-            `Creating Lambda archive of "${path.relative('.', sourceDir)}"`
+            `Creating Lambda archive of "${path.relative('.', sourceDir)}"`,
           )
           const archive = archiver('zip')
           archive.on('error', err => {
@@ -96,12 +96,12 @@ module.exports.AwsProvider = {
             timeout,
           } = {
             timeout: 300,
-          }
+          },
         ) => {
           // Create the Lambda
           const lambdaRuntime = LAMBDA_RUNTIMES[runtime]
           logger.debug(
-            `Creating Lambda "${name}" w/ mem=${size} timeout=${timeout} runtime=${lambdaRuntime}`
+            `Creating Lambda "${name}" w/ mem=${size} timeout=${timeout} runtime=${lambdaRuntime}`,
           )
           const { FunctionArn } = await limiter.schedule(() =>
             lambda
@@ -116,7 +116,7 @@ module.exports.AwsProvider = {
                 Publish: true,
                 Tags,
               })
-              .promise()
+              .promise(),
           )
           // Connect the Lambda to the API Gateway
           await addLambdaToApiGateway({ name, lambdaArn: FunctionArn })
@@ -134,7 +134,7 @@ module.exports.AwsProvider = {
           logger.debug(
             `Deploying API Gateway "${
               faasRestGateway.restApiId
-            }" to "${faasRestGatewayStage}"`
+            }" to "${faasRestGatewayStage}"`,
           )
           const { deploymentId } = await apigtw
             .createDeployment({
@@ -189,7 +189,7 @@ module.exports.AwsProvider = {
       logger.debug(
         `Created API Gateway for "${projectName}" rest_api_id=${restApiId} parent_id=${
           faasRestGateway.parentId
-        }`
+        }`,
       )
     }
 
@@ -230,7 +230,7 @@ module.exports.AwsProvider = {
               ...faasRestGateway,
               pathPart: name,
             })
-            .promise()
+            .promise(),
       )
 
       const integrationParams = {
@@ -243,10 +243,10 @@ module.exports.AwsProvider = {
       await limiter.schedule(() =>
         apigtw
           .putMethod({ ...integrationParams, authorizationType: 'NONE' })
-          .promise()
+          .promise(),
       )
       logger.debug(
-        `Linking ${integrationParams.httpMethod} "/${name}" to Lambda`
+        `Linking ${integrationParams.httpMethod} "/${name}" to Lambda`,
       )
       await limiter.schedule(() =>
         apigtw
@@ -256,10 +256,10 @@ module.exports.AwsProvider = {
             uri: `arn:aws:apigateway:${region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${region}:${accountId}:function:${name}/invocations`,
             integrationHttpMethod: 'POST',
           })
-          .promise()
+          .promise(),
       )
       logger.debug(
-        `Creating response for ${integrationParams.httpMethod} "/${name}"`
+        `Creating response for ${integrationParams.httpMethod} "/${name}"`,
       )
       await limiter.schedule(() =>
         apigtw
@@ -268,10 +268,10 @@ module.exports.AwsProvider = {
             statusCode: '200',
             responseModels: { 'application/json': 'Empty' },
           })
-          .promise()
+          .promise(),
       )
       logger.debug(
-        `Linking Lambda response to ${integrationParams.httpMethod} "/${name}"`
+        `Linking Lambda response to ${integrationParams.httpMethod} "/${name}"`,
       )
       await limiter.schedule(() =>
         apigtw
@@ -280,7 +280,7 @@ module.exports.AwsProvider = {
             statusCode: '200',
             responseTemplates: { 'application/json': '' },
           })
-          .promise()
+          .promise(),
       )
       logger.debug(`Granting API Gateway permission to invoke Lambda "${name}"`)
       await limiter.schedule(() =>
@@ -294,7 +294,7 @@ module.exports.AwsProvider = {
             }/*/${integrationParams.httpMethod}${apiGtwResPath}`,
             StatementId: `api-gateway-${name}`,
           })
-          .promise()
+          .promise(),
       )
     }
 

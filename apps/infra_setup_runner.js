@@ -77,11 +77,11 @@ async function run() {
         return null
       }
     },
-    { concurrency: 4 }
+    { concurrency: 4 },
   )
   await provider.faas.publishHttpFunctions()
   logger.verbose(
-    `Deploying ${params.numFns} FaasInstances took ${Date.now() - lastTime}ms`
+    `Deploying ${params.numFns} FaasInstances took ${Date.now() - lastTime}ms`,
   )
   lastTime = Date.now()
 

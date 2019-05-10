@@ -7,7 +7,7 @@ const id = require('crypto')
 module.exports.handler = async (event, context) => {
   const triggeredTime = Date.now()
   console.log(
-    `run_count=${runCount++} init_time=${initTime} triggered_time=${triggeredTime}`
+    `run_count=${runCount++} init_time=${initTime} triggered_time=${triggeredTime}`,
   )
   return {
     statusCode: 200,

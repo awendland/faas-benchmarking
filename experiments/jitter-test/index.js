@@ -20,7 +20,7 @@ const pingCb = function(options, callback) {
     if (i < options.attempts) {
       connect(
         options,
-        callback
+        callback,
       )
     } else {
       let avg = results.reduce(function(prev, curr) {
@@ -72,7 +72,7 @@ const pingCb = function(options, callback) {
   }
   connect(
     options,
-    callback
+    callback,
   )
 }
 
@@ -86,7 +86,7 @@ const resolveAndPingCb = (options, cb) => {
   const handleAddr = address => {
     console.log(
       `Resolved ${options.hostname} to ${address} in ${Date.now() -
-        time_preDns}ms`
+        time_preDns}ms`,
     )
     const time_prePing = Date.now()
     pingCb(
@@ -101,7 +101,7 @@ const resolveAndPingCb = (options, cb) => {
         console.log(data)
         const sumOfDiff2 = data.results.reduce(
           (acc, cur) => acc + Math.pow(cur.time - data.avg, 2),
-          0
+          0,
         )
         const stddev = Math.sqrt(sumOfDiff2 / data.results.length)
         const minJitter = data.min - data.avg
@@ -113,7 +113,7 @@ const resolveAndPingCb = (options, cb) => {
           maxJitter,
           hostname: options.hostname,
         })
-      }
+      },
     )
   }
 
@@ -143,12 +143,12 @@ if (require.main === module) {
     },
     (err, data) => {
       if (err) throw err
-      console.log(`${data.data}
+      console.log(`
 jitter
   dev=${data.stddev}
   min=${data.minJitter}
   max=${data.maxJitter}`)
-    }
+    },
   )
 }
 

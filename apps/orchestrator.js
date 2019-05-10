@@ -20,7 +20,7 @@ async function run() {
     // TODO check that Triggerer is reachable
     if (!(await triggerer.isReachable())) {
       logger.error(
-        `Unable to connect to Requester at "${triggerer.vm.publicDNS}"`
+        `Unable to connect to Requester at "${triggerer.vm.publicDNS}"`,
       )
       return
     }

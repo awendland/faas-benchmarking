@@ -15,7 +15,7 @@ from pathlib import Path
 #   | awk '{print $2}'
 #   | parallel -j1 'aws apigateway delete-rest-api --rest-api-id {}; echo {}; sleep 60'
 
-NUM_TRIALS = 100
+NUM_TRIALS = 290 # API Gateway only allows 300 resources per REST API
 MEM_SIZES = [128, 256, 512, 1024, 2048] # Taken from the GCP list and within AWS bounds
 RUNTIMES = ['Node8']
 

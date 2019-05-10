@@ -1,4 +1,3 @@
-const { HttpEngine } = require('./lib/triggerer/engine')
 const fs = require('fs')
 const { sleep } = require('./lib/utils')
 
@@ -18,6 +17,7 @@ const filename =
   argv.out ||
   process.env['FILE_NAME'] ||
   `results-${Date.now()}-w${windowSize}r${requestsPerWindow}`
+const parallelize = parseInt(argv.threads || process.env['THREADS']) || 1
 
 run().catch(e => {
   console.error(e.stack)
@@ -25,25 +25,37 @@ run().catch(e => {
 })
 
 async function run() {
-  const warm_start_engine = new HttpEngine({
+  const opts = {
     windowSize,
     requestsPerWindow,
     requestPayloads: null,
     requestUrls,
     logger: console,
-  })
+  }
+  let httpEngine
+  if (parallelize === 1) {
+    const { HttpEngine } = require('./lib/triggerer/engine')
+    httpEngine = new (HttpEngine)(opts)
+  } else {
+    // Since ParallelizedHttpEngine depends on worker_threads, which aren't
+    // available w/o a special flag, only import it if need be
+    const { ParallelizedHttpEngine } = require('./lib/triggerer/parallelized_engine')
+    httpEngine = new ParallelizedHttpEngine(opts, parallelize)
+  }
 
-  await warm_start_engine.run()
+  await httpEngine.run()
   await sleep(testDuration)
-  await warm_start_engine.drain()
+  await httpEngine.drain()
+  const results = await httpEngine.results()
+  await httpEngine.stop()
 
   const output = JSON.stringify(
     {
-      responses: warm_start_engine.responses,
-      errors: warm_start_engine.errors,
+      responses: results.responses,
+      errors: results.errors,
     },
     null,
-    2
+    2,
   )
   fs.writeFileSync(`${filename}`, output)
 }

@@ -28,7 +28,7 @@ module.exports.HttpEngine = class HttpEngine {
         },
         maxOpenRequests: 1500,
       },
-      opts
+      opts,
     )
     opts.requestsPerWindow = [].concat(opts.requestsPerWindow) // Ensure it's an array
     Object.assign(this, opts)
@@ -86,10 +86,20 @@ module.exports.HttpEngine = class HttpEngine {
   /**
    * Stop making requests and abort any pending requests.
    */
-  stop() {
+  async stop() {
     this._shouldRun = false
     this.pendingRequests.forEach(r => r.cancel())
     return this
+  }
+
+  /**
+   * Retrieve the results from all the requests (results + errors)
+   */
+  async results() {
+    return {
+      responses: this.responses,
+      errors: this.errors,
+    }
   }
 
   async _setupConnections() {
@@ -101,7 +111,7 @@ module.exports.HttpEngine = class HttpEngine {
         i =>
           new Promise((resolve, reject) => {
             let { host, port } = url.parse(
-              this.requestUrls[i % this.requestUrls.length]
+              this.requestUrls[i % this.requestUrls.length],
             )
             port = port || 443
             const reqOptions = {
@@ -117,14 +127,14 @@ module.exports.HttpEngine = class HttpEngine {
             })
             req.on('error', err => resolve(err))
             req.end()
-          })
-      )
+          }),
+      ),
     )
     nullsOrErrors.filter(e => !!e).forEach(e => this.logger.debug(e))
     clearInterval(statusId)
     this.logger.debug(
       `Prepared free sockets:`,
-      this.agent.getCurrentStatus().freeSockets
+      this.agent.getCurrentStatus().freeSockets,
     )
   }
 
@@ -140,7 +150,7 @@ module.exports.HttpEngine = class HttpEngine {
         `\tlast_10: ${this.responses
           .slice(-10)
           .map(r => (r && r.timings ? r.timings.phases.total : 'TT'))
-          .join(' ')}`
+          .join(' ')}`,
     )
   }
 
@@ -151,7 +161,7 @@ module.exports.HttpEngine = class HttpEngine {
       if (windowStart - lastStart > this.windowSize * 1.1)
         this.logger.warn(
           `CAN'T HIT LOAD TARGET! Took ${windowStart -
-            lastStart}ms between ticks`
+            lastStart}ms between ticks`,
         )
       lastStart = windowStart
       this._printStatus(windowStart)
@@ -163,7 +173,7 @@ module.exports.HttpEngine = class HttpEngine {
       const sleepMs = this.windowSize - elapsed
       if (sleepMs < 1)
         this.logger.warn(
-          `CAN'T HIT LOAD TARGET! Ran ${-sleepMs}ms past request window`
+          `CAN'T HIT LOAD TARGET! Ran ${-sleepMs}ms past request window`,
         )
       else this.logger.debug(`Processed in ${elapsed}ms`)
       if (this._shouldRun) await sleep(sleepMs)
@@ -186,23 +196,26 @@ module.exports.HttpEngine = class HttpEngine {
       this.logger.warn(
         `CAN'T HIT LOAD TARGET! Too many pending requests: ${
           this.pendingRequests.length
-        }`
+        }`,
       )
     } else {
       const newRequests = _.range(0, this._numRequestsThisTick()).map(i => {
         const url = this.requestUrls[i % this.requestUrls.length]
-        const metadata = { url, tick: this._tick }
+        const metadata = {
+          url,
+          tick: this._tick,
+          window: this.windowSize,
+          size: this._numRequestsThisTick(),
+        }
         const request = this._http.post(url)
         request
           .then(response => {
             this.pendingRequests.splice(
               this.pendingRequests.indexOf(request),
-              1
+              1,
             )
             this.responses.push({
               ...metadata,
-              window: this.windowSize,
-              size: this._numRequestsThisTick(),
               timings: response.timings,
               body: response.body,
             })
@@ -210,7 +223,7 @@ module.exports.HttpEngine = class HttpEngine {
           .catch(e => {
             this.pendingRequests.splice(
               this.pendingRequests.indexOf(request),
-              1
+              1,
             )
             if (request.isCanceled) {
               this.errors.push({ ...metadata, canceled: true })
