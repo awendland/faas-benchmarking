@@ -21,6 +21,6 @@
     "prettier": "^1.17.0"
   },
   "scripts": {
-    "js:prettify": "prettier --single-quote --trailing-comma --no-semi --write 'apps/**/*.js'"
+    "js:prettify": "prettier --single-quote --trailing-comma=all --no-semi --write '{apps,experiments}/**/*.js'"
   }
 }

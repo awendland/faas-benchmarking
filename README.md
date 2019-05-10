@@ -50,3 +50,7 @@ Contains code for orchestrating tests. Each file (excluding `utils.py`) is a tes
 * Infrastructure created (and yet to be destroyed) will be stored in a checkpoint file. This infrastructure will be re-used by subsequent executions with the same run ID (this can be leveraged to debug benchmarking components).
 
 Run a test with `python3 ../test_runs/cold_start_suite.py` (assuming you're in a subfolder, like `results/` where you want the output to be saved).
+
+### `experiments/`
+
+Contains self-contained ad-hoc lil' experiments (for testing things like network jitter or SNTP). Primarily written in node.js. Each experiment _should_ (hopefully) have a Readme file with it.
