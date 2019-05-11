@@ -135,10 +135,11 @@ module.exports.resolveAndPing = resolveAndPing
 ///////////////
 
 if (require.main === module) {
-  const hostname = process.argv[2] || 'alexwendland.com'
+  const [ hostname, port ] = (process.argv[2] || 'alexwendland.com:80').split(':')
   resolveAndPingCb(
     {
       hostname,
+      port,
       attempts: parseInt(process.argv[3] || '20'),
     },
     (err, data) => {
