@@ -1,0 +1,10 @@
+{
+  "name": "autocannon-experiment",
+  "version": "1.0.0",
+  "description": "How many responses can autocannon handle per second?",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "autocannon": "^3.2.1"
+  }
+}
