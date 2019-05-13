@@ -1,8 +1,9 @@
 const _ = require('lodash')
-const got = require('got')
 const https = require('https')
+const { URL } = require('url')
 const AgentKeepAlive = require('agentkeepalive').HttpsAgent
 const url = require('url')
+const { default: hrtimer, toMsTimings } = require('./http-hrtimer')
 const { sleep } = require('../utils')
 
 module.exports.HttpEngine = class HttpEngine {
@@ -32,19 +33,19 @@ module.exports.HttpEngine = class HttpEngine {
     )
     opts.requestsPerWindow = [].concat(opts.requestsPerWindow) // Ensure it's an array
     Object.assign(this, opts)
+    
+    this._urls = this.requestUrls.map(s => new URL(s)).map(u => {
+      if (!u.port || String(url.port) === '80') {
+        u.port = u.protocol === 'https:' ? '443' : '80'
+      }
+      return u
+    })
 
-    this.agent = new AgentKeepAlive({
+    this._agent = new AgentKeepAlive({
       freeSocketTimeout: this.windowSize * 3,
       maxCachedSessions: this.maxOpenRequests,
       maxFreeSockets: this.maxOpenRequests,
       maxSockets: this.maxOpenRequests,
-    })
-
-    this._http = got.extend({
-      agent: this.agent,
-      retry: 0,
-      followRedirect: false,
-      responseType: 'text',
     })
 
     this._tick = 0
@@ -65,6 +66,7 @@ module.exports.HttpEngine = class HttpEngine {
   async run() {
     this._shouldRun = true
     await this._setupConnections()
+    this._startTime = process.hrtime()
     this._loop()
     return this
   }
@@ -80,6 +82,7 @@ module.exports.HttpEngine = class HttpEngine {
       this._printStatus()
       await sleep(500)
     }
+    this.logger.debug(`All pending connections drained...`)
     return this
   }
 
@@ -104,20 +107,17 @@ module.exports.HttpEngine = class HttpEngine {
 
   async _setupConnections() {
     const statusId = setInterval(() => {
-      this.logger.debug(this.agent.getCurrentStatus())
+      this.logger.debug(this._agent.getCurrentStatus())
     }, 5000)
     const nullsOrErrors = await Promise.all(
       _.range(this._maxRequestsPerWindow()).map(
         i =>
           new Promise((resolve, reject) => {
-            let { host, port } = url.parse(
-              this.requestUrls[i % this.requestUrls.length],
-            )
-            port = port || 443
+            const { hostname, port } = this._urls[i % this._urls.length]
             const reqOptions = {
-              host,
+              hostname,
               port,
-              agent: this.agent,
+              agent: this._agent,
               method: 'HEAD',
             }
             // TODO pre-warm TCP connection only, don't make full HTTP request
@@ -134,7 +134,7 @@ module.exports.HttpEngine = class HttpEngine {
     clearInterval(statusId)
     this.logger.debug(
       `Prepared free sockets:`,
-      this.agent.getCurrentStatus().freeSockets,
+      this._agent.getCurrentStatus().freeSockets,
     )
   }
 
@@ -200,27 +200,39 @@ module.exports.HttpEngine = class HttpEngine {
       )
     } else {
       const newRequests = _.range(0, this._numRequestsThisTick()).map(i => {
-        const url = this.requestUrls[i % this.requestUrls.length]
+        const url = this._urls[i % this._urls.length]
         const metadata = {
-          url,
+          url: url.toString(),
           tick: this._tick,
           window: this.windowSize,
           size: this._numRequestsThisTick(),
         }
-        const request = this._http.post(url)
-        request
-          .then(response => {
+        const { hostname, port } = url
+        const requestOptions = {
+          hostname,
+          port,
+          agent: this._agent,
+          method: 'POST',
+        }
+        const request = https.request(requestOptions)
+        const timings = hrtimer(request)
+        request.once('response', res => {
+          let data = ''
+          res.on('data', chunk => {
+            data += chunk
+          })
+          res.on('end', () => {
             this.pendingRequests.splice(
               this.pendingRequests.indexOf(request),
               1,
             )
             this.responses.push({
               ...metadata,
-              timings: response.timings,
-              body: response.body,
+              timings: toMsTimings(timings, this._startTime),
+              body: data,
             })
           })
-          .catch(e => {
+          res.on('error', e => {
             this.pendingRequests.splice(
               this.pendingRequests.indexOf(request),
               1,
@@ -232,6 +244,8 @@ module.exports.HttpEngine = class HttpEngine {
               this.logger.warn(`${e}`)
             }
           })
+        })
+        request.end()
         return request
       })
 
