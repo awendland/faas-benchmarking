@@ -6,15 +6,18 @@ const responseTimes = new Array(3e4)
 
 const url = 'https://alexwendland.com'
 const connections = 300
-const pipelining = 15
-const start = Date.now()
+const pipelining = 1
+const start = new Date()
 
-const instance = autocannon({
-  url: 'https://alexwendland.com',
-  connections,
-  pipelining,
-  duration: 3,
-}, console.log)
+const instance = autocannon(
+  {
+    url: 'https://alexwendland.com',
+    connections,
+    pipelining,
+    duration: 3,
+  },
+  console.log,
+)
 
 // this is used to kill the instance on CTRL-C
 process.once('SIGINT', () => {
@@ -27,7 +30,7 @@ instance.on('response', (client, statusCode, resBytes, responseTime) => {
 
 instance.once('done', () => {
   const validResponses = responseTimes.filter(t => !!t)
-    
+
   const mockOutput = JSON.stringify(
     {
       responses: validResponses.map(t => ({
@@ -36,7 +39,7 @@ instance.once('done', () => {
         window: -1,
         size: connections * pipelining,
         timings: {
-          start,
+          start: start.getTime(),
           socket: 0,
           lookup: 0,
           connect: 0,
@@ -44,13 +47,16 @@ instance.once('done', () => {
           response: t,
           end: 0,
         },
-        body: '{}'
+        body: '{}',
       })),
       errors: [],
     },
     null,
     2,
   )
-  fs.writeFileSync(`${new Date().toISOString()}.mock.results`, mockOutput)
-  fs.writeFileSync(`${new Date().toISOString()}.responses.results`, validResponses.join('\n'))
+  fs.writeFileSync(`${start.toISOString()}.mock.results`, mockOutput)
+  fs.writeFileSync(
+    `${start.toISOString()}.responses.results`,
+    validResponses.join('\n'),
+  )
 })

@@ -3,7 +3,7 @@ const _ = require('lodash')
 const https = require('https')
 const { URL } = require('url')
 const AgentKeepAlive = require('agentkeepalive').HttpsAgent
-const { HttpConnection } = require('./http-connection')
+const url = require('url')
 const { default: hrtimer, toMsTimings } = require('./http-hrtimer')
 const { sleep } = require('../utils')
 
@@ -13,7 +13,7 @@ module.exports.HttpEngine = class HttpEngine {
    * @param opts.requestsPerWindow - How many requests to create during each batch. This can be
    *                                 a single value, or an array, which will be selected from
    *                                 in a round-robin style.
-   * @param opts.url - URL to send requests to (should be a URL object)
+   * @param opts.requestUrls - Chosen in a round-robin fashion by each request in a batch
    * @param opts.requestPayloads - CURRENTLY UNUSED
    * @param opts.logger - Logger to use for reporting info (will default to noop)
    * @param opts.maxOpenRequests - If this cap would be exceeded with the new batch of requests,
@@ -35,11 +35,22 @@ module.exports.HttpEngine = class HttpEngine {
     opts.requestsPerWindow = [].concat(opts.requestsPerWindow) // Ensure it's an array
     Object.assign(this, opts)
 
-    if (!this.url.port || String(this.url.port) === '80') {
-      this.url.port = this.url.protocol === 'https:' ? '443' : '80'
-    }
+    this._urls = this.requestUrls
+      .map(s => new URL(s))
+      .map(u => {
+        if (!u.port || String(url.port) === '80') {
+          u.port = u.protocol === 'https:' ? '443' : '80'
+        }
+        return u
+      })
 
-    this._conns = { free: [], active: [] }
+    this._agent = new AgentKeepAlive({
+      freeSocketTimeout: this.windowSize * 3,
+      maxCachedSessions: this.maxOpenRequests,
+      maxFreeSockets: this.maxOpenRequests,
+      maxSockets: this.maxOpenRequests,
+    })
+
     this._tick = 0
     this._shouldRun = false
     this._timeoutId = null
@@ -97,6 +108,39 @@ module.exports.HttpEngine = class HttpEngine {
     }
   }
 
+  async _setupConnections() {
+    const statusId = setInterval(() => {
+      this.logger.debug(this._agent.getCurrentStatus())
+    }, 5000)
+    const nullsOrErrors = await Promise.all(
+      _.range(this._maxRequestsPerWindow()).map(
+        i =>
+          new Promise((resolve, reject) => {
+            const { hostname, port } = this._urls[i % this._urls.length]
+            const reqOptions = {
+              hostname,
+              port,
+              agent: this._agent,
+              method: 'HEAD',
+            }
+            // TODO pre-warm TCP connection only, don't make full HTTP request
+            const req = https.request(reqOptions, res => {
+              res.resume()
+              res.on('end', () => resolve())
+            })
+            req.on('error', err => resolve(err))
+            req.end()
+          }),
+      ),
+    )
+    nullsOrErrors.filter(e => !!e).forEach(e => this.logger.debug(e))
+    clearInterval(statusId)
+    this.logger.debug(
+      `Prepared free sockets:`,
+      this._agent.getCurrentStatus().freeSockets,
+    )
+  }
+
   _printStatus(windowStart = Date.now()) {
     this.logger.debug(
       `[${windowStart}]` +
@@ -143,25 +187,14 @@ module.exports.HttpEngine = class HttpEngine {
     return this.requestsPerWindow[this._tick % this.requestsPerWindow.length]
   }
 
-  _maxRequests() {
+  _maxRequestsPerWindow() {
     return Math.max(...this.requestsPerWindow)
-  }
-
-  async _setupConnections() {
-    const connectPromises = _.range(this._maxRequests()).map(() =>
-      new HttpConnection({
-        hostname: this.url.hostname,
-        port: this.url.port,
-        protocol: this.url.protocol,
-      }).connect(),
-    )
-    this._conns.free = await Promise.all(connectPromises)
-    this.logger.debug(`Prepared ${this._conns.free.length} sockets`)
   }
 
   async _sendRequests() {
     if (
-      this._conns.free.length < this._numRequestsThisTick()
+      this.pendingRequests.length >
+      this.maxOpenRequests - this._numRequestsThisTick()
     ) {
       this.logger.warn(
         `CAN'T HIT LOAD TARGET! Too many pending requests: ${
@@ -169,50 +202,64 @@ module.exports.HttpEngine = class HttpEngine {
         }`,
       )
     } else {
-      for (let i = 0; i < this._numRequestsThisTick(); ++i) {
+      const newRequests = _.range(0, this._numRequestsThisTick()).map(i => {
+        const url = this._urls[i % this._urls.length]
         const metadata = {
-          url: this.url.toString(),
+          url: url.toString(),
           tick: this._tick,
           window: this.windowSize,
           size: this._numRequestsThisTick(),
         }
-        const httpconn = this._conns.free.pop()
-        const request = httpconn.request({
+        const { hostname, port } = url
+        const requestOptions = {
+          hostname,
+          port,
+          agent: this._agent,
           method: 'POST',
-          path: this.url.path,
-        })
-        this.pendingRequests.push(request)
-        this._conns.active.push(httpconn)
-        const requestFinished = () => {
-          this.pendingRequests.splice(this.pendingRequests.indexOf(request), 1)
-          this._conns.active.splice(this._conns.active.indexOf(httpconn), 1)
-          this._conns.free.push(httpconn)
         }
-        request.then(resp => {
-          requestFinished()
-          this.responses.push({
-            ...metadata,
-            timings: {
-              start: resp.timings.connect,
-              lookup: resp.timings.connect,
-              connect: resp.timings.connect,
-              upload: resp.timings.connect,
-              response: resp.timings.response,
-              end: resp.timings.end,
-            },
-            body: resp.body,
+        const request = https.request(requestOptions)
+        // const timings = hrtimer(request)
+        const start = Date.now()
+        request.once('response', res => {
+          let data = ''
+          res.on('data', chunk => {
+            data += chunk
+          })
+          res.on('end', () => {
+            this.pendingRequests.splice(
+              this.pendingRequests.indexOf(request),
+              1,
+            )
+            this.responses.push({
+              ...metadata,
+              timings: {
+                // toMsTimings(timings, this._startTime),
+                start: start,
+                lookup: start,
+                connect: start,
+                response: Date.now(),
+              },
+              body: data,
+            })
+          })
+          res.on('error', e => {
+            this.pendingRequests.splice(
+              this.pendingRequests.indexOf(request),
+              1,
+            )
+            if (request.isCanceled) {
+              this.errors.push({ ...metadata, canceled: true })
+            } else {
+              this.errors.push({ ...metadata, error: e.toString() })
+              this.logger.warn(`${e}`)
+            }
           })
         })
-        request.catch(e => {
-          requestFinished()
-          if (request.isCanceled) {
-            this.errors.push({ ...metadata, canceled: true })
-          } else {
-            this.errors.push({ ...metadata, error: e.toString() })
-            this.logger.warn(`${e}`)
-          }
-        })
-      }
+        request.end()
+        return request
+      })
+
+      ;[].push.apply(this.pendingRequests, newRequests)
     }
   }
 }

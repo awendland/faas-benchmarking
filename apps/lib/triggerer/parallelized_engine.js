@@ -33,8 +33,9 @@ module.exports.ParallelizedHttpEngine = class ParallelizedHttpEngine {
             ..._.omit(opts, ['logger']),
             requestsPerWindow,
             requestUrls: chunkedUrls ? chunkedUrls[i] : opts.requestUrls,
-            maxOpenRequests: Math.round(opts.maxOpenRequests / threadCount) || undefined, // Eh, just get close enough for now
-          }
+            maxOpenRequests:
+              Math.round(opts.maxOpenRequests / threadCount) || undefined, // Eh, just get close enough for now
+          },
         },
       })
       return worker
