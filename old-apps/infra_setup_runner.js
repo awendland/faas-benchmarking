@@ -21,7 +21,7 @@ const params = {
   runtime: argv.runtime || process.env['RUNTIME'] || 'Node8',
   memSize: parseInt(argv.memsize || process.env['MEM_SIZE']) || 128,
   sourceDir:
-    argv.source || process.env['FN_SRC_DIR'] || path.join(__dirname, 'faas/'),
+    argv.source || process.env['FN_SRC_DIR'] || path.join(__dirname, '..', 'apps', 'faas/'),
   faasTimeout: parseInt(argv.timeout || process.env['FN_TIMEOUT']) || 300,
 }
 

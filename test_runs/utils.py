@@ -49,7 +49,7 @@ def setup_infra(proj_name=None, num_fns=None, runtime=None, mem_size=None, debug
     """
     if not proj_name or not num_fns or not runtime or not mem_size:
         raise Exception('missing param')
-    infra_script = Path(__file__).parent.joinpath('..', 'apps', 'infra_setup_runner.js')
+    infra_script = Path(__file__).parent.joinpath('..', 'old-apps', 'infra_setup_runner.js')
     cmd = ['node', str(infra_script),
            '--loglevel', 'debug' if debug else 'verbose',
            '--project-name', proj_name,
@@ -70,7 +70,7 @@ def send_requests(filename=None, rpws=None, window=None, duration=None, urls=Non
     """
     if not filename or not rpws or not window or not duration or not urls:
         raise Exception('missing param')
-    engine_script = Path(__file__).parent.joinpath('..', 'apps', 'engine_runner.js')
+    engine_script = Path(__file__).parent.joinpath('..', 'old-apps', 'engine_runner.js')
     cmd = ['node', str(engine_script),
            '--window-size', str(window),
            '--rpw', ','.join(map(str, rpws)),
