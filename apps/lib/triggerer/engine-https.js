@@ -258,7 +258,6 @@ module.exports.HttpEngine = class HttpEngine {
         request.end()
         return request
       })
-
       ;[].push.apply(this.pendingRequests, newRequests)
     }
   }

@@ -108,7 +108,9 @@ module.exports.HttpEngine = class HttpEngine {
         `\tpending_req=${this.pendingRequests.length}` +
         `\tlast_10: ${this.responses
           .slice(-10)
-          .map(r => (r && r.timings ? r.timings.phases.total : 'TT'))
+          .map(r =>
+            r && r.timings && r.timings.phases ? r.timings.phases.total : 'TT',
+          )
           .join(' ')}`,
     )
   }
@@ -160,9 +162,7 @@ module.exports.HttpEngine = class HttpEngine {
   }
 
   async _sendRequests() {
-    if (
-      this._conns.free.length < this._numRequestsThisTick()
-    ) {
+    if (this._conns.free.length < this._numRequestsThisTick()) {
       this.logger.warn(
         `CAN'T HIT LOAD TARGET! Too many pending requests: ${
           this.pendingRequests.length

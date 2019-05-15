@@ -17,9 +17,9 @@ class HttpConnection extends EventEmitter {
     this.secure = this.secure || this.protocol === 'https:'
     if (this.secure && this.port === 80) this.port = 443
     if (!this.port) this.port = this.secure ? 443 : 80
-    
+
     this._responseListeners = []
-    this._responses = [{}]
+    this._responses = []
     this._curPipeIdx = 0 // To be used for pipelining, in the future
 
     this._requestBuilder = requestBuilder({
@@ -44,6 +44,7 @@ class HttpConnection extends EventEmitter {
       resp.timings.end = process.hrtime()
       this.emit('response', resp)
       this._responseListeners[this._curPipeIdx]()
+      console.log('message parsed')
       // Handle pipelining stuff like sending more requests or checking limits
     }
   }
@@ -80,17 +81,19 @@ class HttpConnection extends EventEmitter {
   request(request) {
     return new Promise((resolve, reject) => {
       // TODO implement timeout handling
+      console.log('new request')
       const httpRequest = this._requestBuilder(request)
       this.conn.write(httpRequest)
-      const resp = this._responses[this._curPipeIdx]
+      const resp = {}
       resp.timings = { connect: process.hrtime(), phases: {} }
       // TODO handle pipelining
       this._responseListeners[this._curPipeIdx] = () => {
         resolve(resp)
       }
+      this._responses[this._curPipeIdx] = resp
     })
   }
-  
+
   destroy() {
     this.conn.removeAllListeners('error')
     this.conn.removeAllListeners('end')

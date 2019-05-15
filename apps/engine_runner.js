@@ -9,11 +9,7 @@ const windowSize = parseInt(argv['window-size'] || process.env['WINDOW']) || 500
 const requestsPerWindow = String(argv.rpw || process.env['RPW'] || '20')
   .split(',')
   .map(s => parseInt(s))
-const url = new URL(
-  argv.url ||
-  process.env['URL'] ||
-  'http://alexwendland.com'
-)
+const url = new URL(argv.url || process.env['URL'] || 'http://alexwendland.com')
 const testDuration = parseInt(argv.duration || process.env['TEST_DUR']) || 10000
 const filename =
   argv.out ||
@@ -59,7 +55,7 @@ async function run() {
       responses: results.responses.map(r => ({
         ...r,
         timings: toMsTimings(r.timings, startTime),
-        body: typeof r.body === 'string' ? r.body : r.body.toString('utf8')
+        body: typeof r.body === 'string' ? r.body : r.body.toString('utf8'),
       })),
       errors: results.errors,
     },
