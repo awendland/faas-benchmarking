@@ -15,10 +15,7 @@ export type IOrchestratorConstructor<
   Params = {},
   NotableInfra = {}
 > = {
-  new (context: IContext, params: Params): IOrchestrator<
-    Params,
-    NotableInfra
-  >
+  new (context: IContext, params: Params): IOrchestrator<Params, NotableInfra>
 }
 
 export const InfraType = t.keyof({
@@ -52,7 +49,9 @@ export const BaseFaasParams = t.type({
 // HTTPS FaaS
 
 export const HttpsFaasOrchestratorParams = t.exact(BaseFaasParams)
-export type IHttpsFaasOrchestratorParams = t.TypeOf<typeof HttpsFaasOrchestratorParams>
+export type IHttpsFaasOrchestratorParams = t.TypeOf<
+  typeof HttpsFaasOrchestratorParams
+>
 
 export type IHttpsFaasOrchestratorInfra = {
   urls: string[]
@@ -66,7 +65,9 @@ export type IHttpsFaasOrchestrator = IOrchestrator<
 // Pub/Sub FaaS
 
 export const PubsubFaasOrchestratorParams = t.exact(BaseFaasParams)
-export type IPubsubFaasOrchestratorParams = t.TypeOf<typeof PubsubFaasOrchestratorParams>
+export type IPubsubFaasOrchestratorParams = t.TypeOf<
+  typeof PubsubFaasOrchestratorParams
+>
 
 export type IPubsubFaasOrchestratorInfra = {
   urls: string[]

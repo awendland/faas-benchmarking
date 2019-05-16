@@ -26,9 +26,16 @@ export const AwsContext = t.type({
 })
 export type IAwsContext = t.TypeOf<typeof AwsContext>
 
-export const liftAwsContext = (caller: string, context: IContext): IAwsContext => {
+export const liftAwsContext = (
+  caller: string,
+  context: IContext,
+): IAwsContext => {
   if (context.provider.name !== 'aws') {
-    throw new Error(`${caller} was provider a context for "${context.provider.name}" instead of "aws"`)
+    throw new Error(
+      `${caller} was provider a context for "${
+        context.provider.name
+      }" instead of "aws"`,
+    )
   }
   return context.provider
 }

@@ -16,11 +16,10 @@ export type IRunnerConstructor<
   Params = {},
   TargetInfra = {}
 > = {
-  new (
-    context: IContext,
-    params: Params,
-    targets: TargetInfra,
-  ): IRunner<Params, TargetInfra>
+  new (context: IContext, params: Params, targets: TargetInfra): IRunner<
+    Params,
+    TargetInfra
+  >
 }
 
 export const RunnerParams = t.type({

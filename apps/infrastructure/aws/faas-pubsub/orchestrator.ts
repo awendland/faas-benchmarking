@@ -33,7 +33,11 @@ export default class AwsPubsubFaasOrchestrator
     public params: t.TypeOf<typeof PubsubFaasOrchestratorParams>,
   ) {
     if (this.context.provider.name !== 'aws') {
-      throw new Error(`${this.constructor.name} was provider a context for ${this.context.provider.name}`)
+      throw new Error(
+        `${this.constructor.name} was provider a context for ${
+          this.context.provider.name
+        }`,
+      )
     }
     decodeOrThrow(this.params, PubsubFaasOrchestratorParams)
   }

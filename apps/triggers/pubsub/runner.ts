@@ -1,9 +1,12 @@
 import { IContext } from '../../shared/types'
 import { IRunnerConstructor } from '../shared/types'
-import { IPubsubFaasRunner, IPubsubFaasRunnerParams, IPubsubFaasRunnerTargets } from './types'
+import {
+  IPubsubFaasRunner,
+  IPubsubFaasRunnerParams,
+  IPubsubFaasRunnerTargets,
+} from './types'
 
-export default class PubsubFaasRunner
-  implements IPubsubFaasRunner {
+export default class PubsubFaasRunner implements IPubsubFaasRunner {
   public providerRunner: IPubsubFaasRunner
 
   constructor(
