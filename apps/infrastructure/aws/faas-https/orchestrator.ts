@@ -1,80 +1,87 @@
-import * as fs from 'fs'
+import * as fs from 'fs-extra'
 import { promisify } from 'util'
 import * as cp from 'child_process'
 import * as Path from 'path'
+import * as t from 'io-ts'
 import * as _ from 'lodash'
 import { dir as createtmpdir, DirectoryResult } from 'tmp-promise'
-import { AwsProvider } from '../shared'
+import { IContext } from '../../../shared/types'
+import { serverlessBin } from '../shared'
 import { translateToAws, prepareHandlerCodeZip } from '../faas'
 import {
-  HttpsFaasOrchestrator,
-  HttpsFaasOrchestratorConfig,
+  IHttpsFaasOrchestrator,
+  HttpsFaasOrchestratorParams,
+  IHttpsFaasOrchestratorParams,
+  decodeOrThrow,
 } from '../../shared'
 
-/*
- * Path to the `serverless` command that is locally installed with this project,
- * (as opposed to the global one which might be the wrong version)
- */
-const serverlessBin = (() => {
-  const serverlessFile = require.resolve('serverless')
-  const prefix = serverlessFile.split('node_modules')[0]
-  return Path.join(prefix, 'node_modules', '.bin', 'serverless')
-})()
-
-const writeFile = promisify(fs.writeFile)
 const execFile = promisify(cp.execFile)
 
+/**
+ *
+ */
 export default class AwsHttpsFaasOrchestrator
-  implements HttpsFaasOrchestrator<AwsProvider> {
+  implements IHttpsFaasOrchestrator {
   private tmpdir: DirectoryResult | null = null
 
+  /**
+   * NOTE: Due to CloudFormation's resource limit of 200, there is a cap of
+   * ~30 functions that can be created at once
+   */
   constructor(
-    public provider: AwsProvider,
-    public config: HttpsFaasOrchestratorConfig,
-  ) {}
+    public context: IContext,
+    public params: IHttpsFaasOrchestratorParams,
+  ) {
+    if (this.context.provider.name !== 'aws') {
+      throw new Error(`${this.constructor.name} was provider a context for ${this.context.provider.name}`)
+    }
+    decodeOrThrow(this.params, HttpsFaasOrchestratorParams)
+  }
 
+  /**
+   * NOTE: creating 30 functions takes ~100 seconds.
+   */
   async setup() {
     const startTime = Date.now()
-    const queueName = `${this.config.projectName}Queue`
+    const queueName = `${this.context.projectName}Queue`
     this.tmpdir = await createtmpdir({ unsafeCleanup: true })
     console.info(`Working in ${this.tmpdir.path}`)
+
     const packageZip = Path.join(this.tmpdir.path, 'faas.zip')
-    try {
-      await prepareHandlerCodeZip(
-        Path.resolve(this.config.sourceDir),
-        packageZip,
-      )
-    } catch (e) {
-      console.error(e)
-    }
+    await prepareHandlerCodeZip(Path.resolve(this.params.sourceDir), packageZip)
+
+    // TODO use specified AWS region
     const serverlessYaml = `
-service: ${this.config.projectName}
+service: ${this.context.projectName}
 provider:
   name: aws
-  runtime: ${translateToAws.runtime(this.config.runtime)}
-  stackName: ${this.config.projectName}
-  apiName: ${this.config.projectName}
+  runtime: ${translateToAws.runtime(this.params.runtime)}
+  stackName: ${this.context.projectName}
+  apiName: ${this.context.projectName}
 package:
   artifact: ${packageZip}
 functions:
-${_.range(this.config.numberOfFunctions).map(
-  i => `
+${_.range(this.params.numberOfFunctions)
+  .map(
+    i => `
   fn${i}:
     handler: index.handler
-    memorySize: ${this.config.memorySize}
-    timeout: ${this.config.timeout}
+    memorySize: ${this.params.memorySize}
+    timeout: ${this.params.timeout}
     events:
       - http: post fn${i}`,
-)}
+  )
+  .join('\n')}
 `
-    await writeFile(
+    await fs.writeFile(
       Path.join(this.tmpdir.path, 'serverless.yml'),
       serverlessYaml,
     )
+
     console.debug(`Running ${serverlessBin} deploy`)
     const { stdout } = await execFile(
       serverlessBin,
-      [`--region=${this.provider.region}`, `deploy`],
+      [`--region=${this.context.provider.params.region}`, `deploy`],
       {
         cwd: this.tmpdir.path,
         maxBuffer: 50 * 1024 * 1024, // Max amount of bytes allowed on stdout and stderr
@@ -82,9 +89,12 @@ ${_.range(this.config.numberOfFunctions).map(
     )
     console.debug(stdout)
     console.debug(`Setup in ${(Date.now() - startTime) / 1000} sec`)
+
     return {
       urls: (() => {
-        const endpointsRaw = stdout.match(/endpoints:\s([\s\S]+)\sfunctions:/m)![1]
+        const endpointsRaw = stdout.match(
+          /endpoints:\s([\s\S]+)\sfunctions:/m,
+        )![1]
         return endpointsRaw.split('\n').map(
           l =>
             l
@@ -98,15 +108,11 @@ ${_.range(this.config.numberOfFunctions).map(
 
   async teardown() {
     if (this.tmpdir) {
-      try {
-        const {stdout} = await execFile(serverlessBin, [`remove`], {
-          cwd: this.tmpdir.path,
-        })
-        console.debug(stdout)
-        await this.tmpdir.cleanup()
-      } catch (e) {
-        console.error(e)
-      }
+      const { stdout } = await execFile(serverlessBin, [`remove`], {
+        cwd: this.tmpdir.path,
+      })
+      console.debug(stdout)
+      await this.tmpdir.cleanup()
     }
   }
 }

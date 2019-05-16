@@ -1,55 +1,78 @@
-export type Orchestrator<Provider, Config, NotableInfra> = {
+import * as t from 'io-ts'
+import { IContext } from '../../shared'
+
+///////////////////
+// Orchestrators //
+///////////////////
+
+export type IOrchestrator<Params, NotableInfra> = {
   setup(): Promise<NotableInfra>
   teardown(): Promise<void>
 }
 
-export type OrchestratorConstructor<Provider, Config, NotableInfra> = {
-  new (provider: Provider, config: Config): Orchestrator<
-    Provider,
-    Config,
+export type IOrchestratorConstructor<
+  ProviderConfig = {},
+  Params = {},
+  NotableInfra = {}
+> = {
+  new (context: IContext, params: Params): IOrchestrator<
+    Params,
     NotableInfra
   >
 }
 
-export type BaseConfig = {
-  projectName: string
-}
+export const InfraType = t.keyof({
+  'faas-https': null,
+  'faas-pubsub': null,
+})
+export type IInfraType = t.TypeOf<typeof InfraType>
 
-export type FaasSize = '128' | '256' | '512' | '1024' | '2048'
-export type FaasRuntime = 'node8'
+export const FaasSize = t.keyof({
+  '128': null,
+  '256': null,
+  '512': null,
+  '1024': null,
+  '2048': null,
+})
+export type IFaasSize = t.TypeOf<typeof FaasSize>
 
-export type BaseFaasConfig = BaseConfig & {
-  numberOfFunctions: number
-  memorySize: FaasSize
-  runtime: FaasRuntime
-  sourceDir: string
-  timeout: number
-}
+export const FaasRuntime = t.keyof({
+  node8: null,
+})
+export type IFaasRuntime = t.TypeOf<typeof FaasRuntime>
+
+export const BaseFaasParams = t.type({
+  numberOfFunctions: t.number,
+  memorySize: FaasSize,
+  runtime: FaasRuntime,
+  sourceDir: t.string,
+  timeout: t.number,
+})
 
 // HTTPS FaaS
 
-export type HttpsFaasOrchestratorConfig = BaseFaasConfig
+export const HttpsFaasOrchestratorParams = t.exact(BaseFaasParams)
+export type IHttpsFaasOrchestratorParams = t.TypeOf<typeof HttpsFaasOrchestratorParams>
 
-export type HttpsFaasOrchestratorInfra = {
+export type IHttpsFaasOrchestratorInfra = {
   urls: string[]
 }
 
-export type HttpsFaasOrchestrator<Provider> = Orchestrator<
-  Provider,
-  HttpsFaasOrchestratorConfig,
-  HttpsFaasOrchestratorInfra
+export type IHttpsFaasOrchestrator = IOrchestrator<
+  t.TypeOf<typeof HttpsFaasOrchestratorParams>,
+  IHttpsFaasOrchestratorInfra
 >
 
 // Pub/Sub FaaS
 
-export type PubsubFaasOrchestratorConfig = BaseFaasConfig
+export const PubsubFaasOrchestratorParams = t.exact(BaseFaasParams)
+export type IPubsubFaasOrchestratorParams = t.TypeOf<typeof PubsubFaasOrchestratorParams>
 
-export type PubsubFaasOrchestratorInfra = {
+export type IPubsubFaasOrchestratorInfra = {
   urls: string[]
 }
 
-export type PubsubFaasOrchestrator<Provider> = Orchestrator<
-  Provider,
-  HttpsFaasOrchestratorConfig,
-  HttpsFaasOrchestratorInfra
+export type IPubsubFaasOrchestrator = IOrchestrator<
+  t.TypeOf<typeof HttpsFaasOrchestratorParams>,
+  IHttpsFaasOrchestratorInfra
 >

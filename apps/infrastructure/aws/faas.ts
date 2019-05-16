@@ -1,16 +1,16 @@
 import * as fs from 'fs'
 import archiver = require('archiver')
-import { FaasSize, FaasRuntime } from '../shared'
+import { IFaasSize, IFaasRuntime } from '../shared'
 
-export type AwsFaasSize = '128' | '256' | '512' | '1024' | '2048'
-export type AwsFaasRuntime = 'nodejs8.10'
+export type IAwsFaasSize = '128' | '256' | '512' | '1024' | '2048'
+export type IAwsFaasRuntime = 'nodejs8.10'
 
 export const translateToAws = {
-  size: (faasSize: FaasSize): AwsFaasSize => faasSize,
-  runtime: (faasRuntime: FaasRuntime): AwsFaasRuntime =>
+  size: (faasSize: IFaasSize): IAwsFaasSize => faasSize,
+  runtime: (faasRuntime: IFaasRuntime): IAwsFaasRuntime =>
     ({
       node8: 'nodejs8.10',
-    }[faasRuntime] as AwsFaasRuntime),
+    }[faasRuntime] as IAwsFaasRuntime),
 }
 
 export const prepareHandlerCodeZip = (sourceDir: string, outfile: string) =>
