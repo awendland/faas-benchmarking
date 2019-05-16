@@ -10,18 +10,11 @@ TODO
 
 Contains code for analyzing test results. Primarily written in Python.
 
-The main program for generating graphs is `parser.py` which can be run with `python3 parser.py $FILES $GRAPH_TYPE --other-params`. An example would be `python3 parser.py ../results/some-result.json cdf`.
+The main program for generating graphs is `graph.py` which can be run with `python3 parser.py $FILES $GRAPH_TYPE --other-params`. An example would be `python3 graph.py ../results/some-result.json cdf`.
 
 Additional programs exist for analysis, such as `*.ipynb` files that have been used to explore results.
 
-A `Pipfile` has yet to be written, but the current list of dependencies is:
-
-```
-matplotlib
-numpy
-pandas
-altair
-```
+A `requirements.txt` lists the Python dependencies.
 
 Altair also needs to be setup with Jupyter follwing the [Altair + Jupyter Quickstart](https://altair-viz.github.io/getting_started/installation.html#quick-start-altair-notebook).
 
