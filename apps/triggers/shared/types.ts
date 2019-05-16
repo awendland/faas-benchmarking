@@ -1,9 +1,21 @@
 import * as t from 'io-ts'
 import { FaasResponse, IContext } from '../../shared'
 
+export const TriggerType = t.keyof({
+  https: null,
+  pubsub: null,
+})
+export type ITriggerType = t.TypeOf<typeof TriggerType>
+
 /////////////
 // Runners //
 /////////////
+
+export type IRunnerModule = {
+  default: IRunnerConstructor
+  ParamsType: t.Type<any, any, any>
+  TargetsType: t.Type<any, any, any>
+}
 
 export const ResultEvent = t.type({
   /**
@@ -26,7 +38,7 @@ export const Result = t.type({
 })
 export type IResult = t.TypeOf<typeof Result>
 
-export type IRunner<Params, TargetInfra> = {
+export type IRunner<Params = {}, TargetInfra = {}> = {
   setup(): Promise<void>
   run(): Promise<IResult>
   teardown(): Promise<void>
@@ -43,14 +55,9 @@ export type IRunnerConstructor<
   >
 }
 
-export const RunnerParams = t.type({
-  duration: t.number,
-})
-export type IRunnerParams = t.TypeOf<typeof RunnerParams>
-
 // HTTPS FaaS
 
-export const HttpsFaasRunnerParams = t.exact(RunnerParams)
+export const HttpsFaasRunnerParams = t.number
 export type IHttpsFaasRunnerParams = t.TypeOf<typeof HttpsFaasRunnerParams>
 
 export type IHttpsFaasRunnerTargets = {

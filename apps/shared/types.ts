@@ -90,7 +90,7 @@ export type IProviderContext = t.TypeOf<typeof ProviderContext>
 
 export const Context = t.type({
   projectName: t.string,
-  triggerRunnerPublicIp: t.string,
+  triggerRunnerPublicIp: t.union([t.string, t.undefined]),
   provider: ProviderContext,
 })
 export type IContext = t.TypeOf<typeof Context>

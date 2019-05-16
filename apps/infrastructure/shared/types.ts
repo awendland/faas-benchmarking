@@ -58,7 +58,7 @@ export type IHttpsFaasOrchestratorInfra = {
 }
 
 export type IHttpsFaasOrchestrator = IOrchestrator<
-  t.TypeOf<typeof HttpsFaasOrchestratorParams>,
+  IHttpsFaasOrchestratorParams,
   IHttpsFaasOrchestratorInfra
 >
 
@@ -70,10 +70,10 @@ export type IPubsubFaasOrchestratorParams = t.TypeOf<
 >
 
 export type IPubsubFaasOrchestratorInfra = {
-  urls: string[]
+  queues: string[]
 }
 
 export type IPubsubFaasOrchestrator = IOrchestrator<
-  t.TypeOf<typeof HttpsFaasOrchestratorParams>,
-  IHttpsFaasOrchestratorInfra
+  IPubsubFaasOrchestratorParams,
+  IPubsubFaasOrchestratorInfra
 >

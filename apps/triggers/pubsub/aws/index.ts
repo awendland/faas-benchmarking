@@ -15,7 +15,15 @@ import {
 } from '../types'
 import CallbackServer from '../../shared/callback-server'
 
+///////////////////
+// Magic Numbers //
+///////////////////
+
 export const PUBSUB_BATCH_SIZE = 10
+
+//////////////////////
+// Additional Types //
+//////////////////////
 
 export type IRequestId = string
 
@@ -32,7 +40,10 @@ export type IRequest = {
   timeAfterSdkCall: number
 }
 
-export default class PubsubFaasRunner implements IPubsubFaasRunner {
+/**
+ * Implementation of PubsubFaasRunner for AWS.
+ */
+export default class AwsPubsubFaasRunner implements IPubsubFaasRunner {
   public provider: IAwsContext
   public sqs: aws.SQS
   public server: CallbackServer
@@ -55,21 +66,21 @@ export default class PubsubFaasRunner implements IPubsubFaasRunner {
     await this.server.start()
   }
 
-  /**
-   *
-   */
   async run(): Promise<IResult> {
     const MessageBody = JSON.stringify({
-      webhook: `http://${this.context.triggerRunnerPublicIp}:${
-        this.server.port
-      }`,
-      requestId: 'REPLACE_ID',
       ...this.params.faasParams,
+      webhook: `${this.context.triggerRunnerPublicIp}:${this.server.port}`,
+      requestId: 'REPLACE_ID',
     })
     const message = (id: string) => ({
       Id: id,
       MessageBody: MessageBody.replace('REPLACE_ID', id),
     })
+    console.debug(
+      `Sending ${
+        this.params.numberOfMessages
+      } messages to SQS in batches of ${PUBSUB_BATCH_SIZE}`,
+    )
     await Promise.all(
       _.chunk(
         _.range(this.params.numberOfMessages).map(i => String(i)),
@@ -84,13 +95,32 @@ export default class PubsubFaasRunner implements IPubsubFaasRunner {
           .promise()
         const timeAfterSdkCall = Date.now()
         for (const i of ii) {
-          this.requests.set(i, {
-            timeBeforeSdkCall,
-            timeAfterSdkCall,
-          })
+          if (this.requests.has(i)) {
+            console.warn(
+              `Duplicate callbacks seen for request ${i}. The first will be used for analysis.`,
+            )
+          } else {
+            this.requests.set(i, {
+              timeBeforeSdkCall,
+              timeAfterSdkCall,
+            })
+          }
         }
       }),
     )
+    const callbackTimeout = 30 * 1000
+    console.debug(`Waiting ${callbackTimeout / 1000} sec for HTTP callbacks...`)
+    const didSeeRequests = await this.server.waitUntil({
+      numRequests: this.params.numberOfMessages,
+      timeout: callbackTimeout,
+    })
+    if (!didSeeRequests) {
+      console.warn(
+        `CallbackServer timed out with ${this.server.requests.length}/${
+          this.params.numberOfMessages
+        } requests seen`,
+      )
+    }
     await this.server.stop()
     const events: IResultEvent[] = this.server.requests.map(callbacks => {
       const faasData: IFaasResponse = JSON.parse(callbacks.rawData)
@@ -105,7 +135,7 @@ export default class PubsubFaasRunner implements IPubsubFaasRunner {
     }
   }
 
-  teardown(): Promise<void> {
-    throw new Error('Method not implemented yet...')
+  async teardown(): Promise<void> {
+    /* noop */
   }
 }
