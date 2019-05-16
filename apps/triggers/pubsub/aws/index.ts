@@ -69,7 +69,7 @@ export default class AwsPubsubFaasRunner implements IPubsubFaasRunner {
   async run(): Promise<IResult> {
     const MessageBody = JSON.stringify({
       ...this.params.faasParams,
-      webhook: `${this.context.triggerRunnerPublicIp}:${this.server.port}`,
+      webhook: `http://${this.context.triggerRunnerPublicIp}:${this.server.port}`,
       requestId: 'REPLACE_ID',
     })
     const message = (id: string) => ({
@@ -108,19 +108,11 @@ export default class AwsPubsubFaasRunner implements IPubsubFaasRunner {
         }
       }),
     )
-    const callbackTimeout = 30 * 1000
-    console.debug(`Waiting ${callbackTimeout / 1000} sec for HTTP callbacks...`)
+    const callbackTimeout = 120 * 1000
     const didSeeRequests = await this.server.waitUntil({
       numRequests: this.params.numberOfMessages,
       timeout: callbackTimeout,
     })
-    if (!didSeeRequests) {
-      console.warn(
-        `CallbackServer timed out with ${this.server.requests.length}/${
-          this.params.numberOfMessages
-        } requests seen`,
-      )
-    }
     await this.server.stop()
     const events: IResultEvent[] = this.server.requests.map(callbacks => {
       const faasData: IFaasResponse = JSON.parse(callbacks.rawData)

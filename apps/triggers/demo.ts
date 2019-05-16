@@ -53,7 +53,7 @@ const run = async () => {
     targets,
   )
   await runner.setup()
-  console.log(await runner.run())
+  console.log(JSON.stringify(await runner.run(), null, 2))
   await runner.teardown()
 }
 

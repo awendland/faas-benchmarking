@@ -10,6 +10,7 @@ const id = require('crypto')
 /////////////
 
 const http = require('http')
+const url = require('url')
 
 ///////////
 // Utils //
@@ -44,8 +45,9 @@ module.exports.handler = async args => {
       // TODO better socket timing (open socket, then record time and send HTTP request manually, with updated time)
       const request = http.request(
         {
-          host: webhook,
           method: 'POST',
+          ...url.parse(webhook),
+          timeout: 3 * 1000,
         },
         resp => {
           resp.resume()
@@ -53,6 +55,9 @@ module.exports.handler = async args => {
           resp.on('end', resolve())
         },
       )
+      request.on('timeout', () => {
+        request.abort();
+      })
       request.write(body)
       request.end()
     })

@@ -90,12 +90,24 @@ export default class CallbackServer extends EventEmitter {
     numRequests: number
     timeout: number
   }): Promise<boolean> {
+    console.debug(`Waiting up to ${timeout / 1000} sec for HTTP callbacks...`)
     const startTime = Date.now()
+    let didTimeout = false
     while (true) {
       await sleep(2000)
-      if (this.requests.length >= numRequests) return true
+      if (this.requests.length >= numRequests) break
       const elapsedTime = Date.now() - startTime
-      if (elapsedTime > timeout) return false
+      if (elapsedTime > timeout) {
+        didTimeout = true
+        break
+      }
+    }
+    if (didTimeout) {
+      console.warn(
+        `Callback Server timed out with ${this.server.requests.length}/${
+          this.params.numberOfMessages
+        } requests seen`,
+      )
     }
   }
 
