@@ -35,12 +35,17 @@ const run = async () => {
 
   console.log(results)
   console.log(
-    `CallbackServer recorded ${server.requests.length} request and used ${process.memoryUsage().rss} MB of memory`,
+    `CallbackServer recorded ${
+      server.requests.length
+    } request and used ${process.memoryUsage().rss /
+      (1024 * 1024)} MiB of memory`,
     server.requests[0],
   )
 }
 
-run().catch(e => {
-  console.error(e)
-  process.exit(1)
-})
+if (require.main === module) {
+  run().catch(e => {
+    console.error(e)
+    process.exit(1)
+  })
+}

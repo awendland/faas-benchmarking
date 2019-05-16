@@ -1,21 +1,19 @@
 import * as t from 'io-ts'
 import { FaasParams } from '../../shared/types'
-import { RunnerParams, IRunner } from '../shared'
+import { IRunner } from '../shared'
 
 export const PubsubFaasRunnerParams = t.exact(
-  t.intersection([
-    RunnerParams,
-    t.type({
-      numberOfMessages: t.number,
-      faasParams: FaasParams,
-    }),
-  ]),
+  t.type({
+    numberOfMessages: t.number,
+    faasParams: FaasParams,
+  }),
 )
 export type IPubsubFaasRunnerParams = t.TypeOf<typeof PubsubFaasRunnerParams>
 
-export type IPubsubFaasRunnerTargets = {
-  queue: string
-}
+export const PubsubFaasRunnerTargets = t.type({
+  queue: t.string,
+})
+export type IPubsubFaasRunnerTargets = t.TypeOf<typeof PubsubFaasRunnerTargets>
 
 export type IPubsubFaasRunner = IRunner<
   IPubsubFaasRunnerParams,

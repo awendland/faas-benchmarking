@@ -2,6 +2,7 @@ import * as fs from 'fs-extra'
 import { promisify } from 'util'
 import * as cp from 'child_process'
 import * as Path from 'path'
+import * as aws from 'aws-sdk'
 import * as t from 'io-ts'
 import * as _ from 'lodash'
 import { dir as createtmpdir, DirectoryResult } from 'tmp-promise'
@@ -12,10 +13,19 @@ import {
   IPubsubFaasOrchestrator,
   PubsubFaasOrchestratorParams,
   IPubsubFaasOrchestratorParams,
-  decodeOrThrow,
 } from '../../shared'
+import { decodeOrThrow } from '../../../shared/utils'
 
 const execFile = promisify(cp.execFile)
+
+/*
+ * So that this module conforms to:
+ * {
+ *  default: IOrchestratorConstructor,
+ *  ParamsType: typeof default.params,
+ * }
+ */
+export const ParamsType = PubsubFaasOrchestratorParams
 
 /**
  *
@@ -23,6 +33,7 @@ const execFile = promisify(cp.execFile)
 export default class AwsPubsubFaasOrchestrator
   implements IPubsubFaasOrchestrator {
   private tmpdir: DirectoryResult | null = null
+  public sqs: aws.SQS
 
   /**
    * NOTE: Due to CloudFormation's resource limit of 200, there is a cap of
@@ -30,16 +41,18 @@ export default class AwsPubsubFaasOrchestrator
    */
   constructor(
     public context: IContext,
-    public params: t.TypeOf<typeof PubsubFaasOrchestratorParams>,
+    public params: IPubsubFaasOrchestratorParams,
   ) {
     if (this.context.provider.name !== 'aws') {
       throw new Error(
-        `${this.constructor.name} was provider a context for ${
+        `${this.constructor.name} was provided a context for ${
           this.context.provider.name
         }`,
       )
     }
     decodeOrThrow(this.params, PubsubFaasOrchestratorParams)
+    aws.config.region = this.context.provider.params.region
+    this.sqs = new aws.SQS({ apiVersion: '2012-11-05' })
   }
 
   /**
@@ -47,8 +60,11 @@ export default class AwsPubsubFaasOrchestrator
    */
   async setup() {
     const startTime = Date.now()
-    const queueName = `${this.context.projectName}Queue`
-    this.tmpdir = await createtmpdir({ unsafeCleanup: true })
+    const queuePrefix = `${this.context.projectName}Queue`
+    this.tmpdir = await createtmpdir({
+      prefix: 'faas-pubsub-aws-',
+      unsafeCleanup: true,
+    })
     console.info(`Working in ${this.tmpdir.path}`)
 
     const packageZip = Path.join(this.tmpdir.path, 'faas.zip')
@@ -70,7 +86,7 @@ ${_.range(this.params.numberOfFunctions)
   .map(
     i => `
   fn${i}:
-    handler: index.${this.context.provider.name}.pubsub
+    handler: index.${this.context.provider.name}_pubsub
     memorySize: ${this.params.memorySize}
     timeout: ${this.params.timeout}
     events:
@@ -78,16 +94,21 @@ ${_.range(this.params.numberOfFunctions)
           batchSize: 1
           arn:
             Fn::GetAtt:
-              - Queue
-              - Arn
+              - Queue${i}
+              - Arn`,
   )
-  .join('\n')}
+  .join('')}
 resources:
   Resources:
-    Queue:
+${_.range(this.params.numberOfFunctions)
+  .map(
+    i => `
+    Queue${i}:
       Type: "AWS::SQS::Queue"
       Properties:
-        QueueName: "${queueName}"
+        QueueName: "${queuePrefix}${i}"`,
+  )
+  .join('')}
 `
     await fs.writeFile(
       Path.join(this.tmpdir.path, 'serverless.yml'),
@@ -105,25 +126,21 @@ resources:
     )
     console.debug(stdout)
     console.debug(`Setup in ${(Date.now() - startTime) / 1000} sec`)
-
+    console.debug(`Retrieving SQS Queue URLs`)
+    const listQueueData = await this.sqs
+      .listQueues({ QueueNamePrefix: queuePrefix })
+      .promise()
+    if (!listQueueData || !listQueueData.QueueUrls) {
+      throw new Error(`Unable to retrieve queues`)
+    }
     return {
-      urls: (() => {
-        const endpointsRaw = stdout.match(
-          /endpoints:\s([\s\S]+)\sfunctions:/m,
-        )![1]
-        return endpointsRaw.split('\n').map(
-          l =>
-            l
-              .trim()
-              .replace(/,$/, '')
-              .match(/\w{3,6} - (.+)$/)![1],
-        )
-      })(),
+      queues: listQueueData.QueueUrls,
     }
   }
 
   async teardown() {
     if (this.tmpdir) {
+      console.debug(`Running ${serverlessBin} remove`)
       const { stdout } = await execFile(serverlessBin, [`remove`], {
         cwd: this.tmpdir.path,
       })

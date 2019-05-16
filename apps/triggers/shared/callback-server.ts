@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events'
 import * as http from 'http'
 import * as t from 'io-ts'
+import { sleep } from '../../shared/utils'
 
 export const RequestRecord = t.type({
   /**
@@ -73,6 +74,29 @@ export default class CallbackServer extends EventEmitter {
     return new Promise(resolve => {
       this.server!.listen(this.port, this.host, () => resolve())
     })
+  }
+
+  /**
+   * Return a promise that only resolves once the server has seen a certain
+   * number of requests, or a timeout is reached.
+   * @param args.numRequests How many requests to wait for
+   * @param args.timeout Maximum time (in ms) to wait for requests before returning
+   * @returns True if the numRequests was seen, false if the timeout was reached
+   */
+  async waitUntil({
+    numRequests,
+    timeout,
+  }: {
+    numRequests: number
+    timeout: number
+  }): Promise<boolean> {
+    const startTime = Date.now()
+    while (true) {
+      await sleep(2000)
+      if (this.requests.length >= numRequests) return true
+      const elapsedTime = Date.now() - startTime
+      if (elapsedTime > timeout) return false
+    }
   }
 
   /**

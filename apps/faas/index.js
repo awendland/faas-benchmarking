@@ -24,7 +24,7 @@ const delay = ms => new Promise(res => setTimeout(() => res(), ms))
 module.exports.handler = async args => {
   const { triggeredTime, requestId, sleep, webhook, ...providerData } = args
   process.stdout.write(
-    `run_count=${runCount++} init_time=${initTime} triggered_time=${triggeredTime} sleep=${sleep}`,
+    `run_count=${runCount++} init_time=${initTime} triggered_time=${triggeredTime} sleep=${sleep} webhook=${webhook}\n`,
   )
   if (sleep) {
     await delay(sleep)
@@ -41,6 +41,7 @@ module.exports.handler = async args => {
   })
   if (webhook) {
     await new Promise((resolve, reject) => {
+      // TODO better socket timing (open socket, then record time and send HTTP request manually, with updated time)
       const request = http.request(
         {
           host: webhook,
@@ -63,10 +64,7 @@ module.exports.handler = async args => {
 // Trigger Interfaces //
 ////////////////////////
 
-/**
- * Namespace holding handlers for AWS
- */
-module.exports.aws = {}
+// AWS
 
 /**
  * Pull interested details out of the AWS context to return to the caller
@@ -83,7 +81,7 @@ const awsExtractContextDetails = context => ({
  *
  * NOTE: LAMBDA_PROXY configuration is expected.
  */
-module.exports.aws.https = async (event, context) => {
+module.exports.aws_https = async (event, context) => {
   const triggeredTime = Date.now()
   const body = await module.exports.handler({
     ...(event.queryStringParameters || {}),
@@ -104,11 +102,12 @@ module.exports.aws.https = async (event, context) => {
  *
  * NOTE: A batch size of 1 is expected.
  */
-module.exports.aws.pubsub = async (event, context) => {
+module.exports.aws_pubsub = async (event, context) => {
   const triggeredTime = Date.now()
   const body = await module.exports.handler({
     ...JSON.parse(event.Records[0].body),
     ...awsExtractContextDetails(context),
+    triggeredTime,
   })
   return
 }

@@ -18,6 +18,15 @@ import {
 const execFile = promisify(cp.execFile)
 
 /**
+ * So that this module conforms to:
+ * {
+ *  default: IOrchestratorConstructor,
+ *  ParamsType: typeof default.params,
+ * }
+ */
+export const ParamsType = HttpsFaasOrchestratorParams
+
+/**
  *
  */
 export default class AwsHttpsFaasOrchestrator
@@ -34,7 +43,7 @@ export default class AwsHttpsFaasOrchestrator
   ) {
     if (this.context.provider.name !== 'aws') {
       throw new Error(
-        `${this.constructor.name} was provider a context for ${
+        `${this.constructor.name} was provided a context for ${
           this.context.provider.name
         }`,
       )
@@ -48,7 +57,10 @@ export default class AwsHttpsFaasOrchestrator
   async setup() {
     const startTime = Date.now()
     const queueName = `${this.context.projectName}Queue`
-    this.tmpdir = await createtmpdir({ unsafeCleanup: true })
+    this.tmpdir = await createtmpdir({
+      prefix: 'faas-https-aws-',
+      unsafeCleanup: true,
+    })
     console.info(`Working in ${this.tmpdir.path}`)
 
     const packageZip = Path.join(this.tmpdir.path, 'faas.zip')
@@ -69,7 +81,7 @@ ${_.range(this.params.numberOfFunctions)
   .map(
     i => `
   fn${i}:
-    handler: index.${this.context.provider.name}.https
+    handler: index.${this.context.provider.name}_https
     memorySize: ${this.params.memorySize}
     timeout: ${this.params.timeout}
     events:
@@ -112,6 +124,7 @@ ${_.range(this.params.numberOfFunctions)
 
   async teardown() {
     if (this.tmpdir) {
+      console.debug(`Running ${serverlessBin} remove`)
       const { stdout } = await execFile(serverlessBin, [`remove`], {
         cwd: this.tmpdir.path,
       })
