@@ -19,23 +19,19 @@ const orchestratorConstructor: IOrchestratorConstructor = require('./' +
 if (require.main === module) {
   ;(async () => {
     const orchestrator = new orchestratorConstructor(
-      Object.assign(
-        {
-          region: 'us-east-1',
-        },
-        argv,
-      ),
-      Object.assign(
-        {
-          projectName: `test-${Date.now().toString(36)}`,
-          numberOfFunctions: 30,
-          memorySize: '128',
-          runtime: 'node8',
-          sourceDir: '../../../faas',
-          timeout: 30,
-        },
-        argv,
-      ),
+      {
+        region: 'us-east-1',
+        ...argv
+      },
+      {
+        projectName: `test-${Date.now().toString(36)}`,
+        numberOfFunctions: 30,
+        memorySize: '128',
+        runtime: 'node8',
+        sourceDir: '../../../faas',
+        timeout: 30,
+        ...argv,
+      },
     )
     try {
       console.log(await orchestrator.setup())

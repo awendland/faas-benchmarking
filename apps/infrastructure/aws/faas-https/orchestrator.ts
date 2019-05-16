@@ -69,7 +69,7 @@ ${_.range(this.params.numberOfFunctions)
   .map(
     i => `
   fn${i}:
-    handler: index.handler
+    handler: index.${this.context.provider.name}.https
     memorySize: ${this.params.memorySize}
     timeout: ${this.params.timeout}
     events:

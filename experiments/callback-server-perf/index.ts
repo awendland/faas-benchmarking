@@ -11,7 +11,9 @@ const run = async () => {
   await server.start()
 
   const autocannon = fork(__dirname + '/autocannon')
-  autocannon.on('error', e => { throw e })
+  autocannon.on('error', e => {
+    throw e
+  })
   autocannon.send({
     cmd: 'start',
     params: {
@@ -20,17 +22,9 @@ const run = async () => {
       duration: 30,
       method: 'POST',
       body: JSON.stringify(
-        (await faasSrc.handler(
-          {},
-          {
-            functionName: '',
-            functionVersion: '',
-            invokedFunctionArn: '',
-            awsRequestId: '',
-          },
-        )).body,
+        await faasSrc.handler({ triggeredTime: Date.now() }),
       ),
-    }
+    },
   })
   const results = await new Promise(resolve => {
     autocannon.on('message', resolve)
@@ -41,7 +35,7 @@ const run = async () => {
 
   console.log(results)
   console.log(
-    `CallbackServer recorded ${server.requests.length} request`,
+    `CallbackServer recorded ${server.requests.length} request and used ${process.memoryUsage().rss} MB of memory`,
     server.requests[0],
   )
 }

@@ -9,6 +9,29 @@ export const Provider = t.keyof({
 })
 export type IProvider = t.TypeOf<typeof Provider>
 
+//////////
+// FaaS //
+//////////
+
+export const FaasParams = t.type({
+  requestId: t.union([t.string, t.undefined]),
+  sleep: t.union([t.number, t.undefined]),
+  webhook: t.union([t.string, t.undefined]),
+})
+export type IFaasParams = t.TypeOf<typeof FaasParams>
+
+export const FaasResponse = t.intersection([
+  FaasParams,
+  t.type({
+    id: t.string,
+    initTime: t.number,
+    runCount: t.number,
+    triggeredTime: t.number,
+    providerData: t.any,
+  }),
+])
+export type IFaasResponse = t.TypeOf<typeof FaasResponse>
+
 /////////
 // AWS //
 /////////
@@ -67,6 +90,7 @@ export type IProviderContext = t.TypeOf<typeof ProviderContext>
 
 export const Context = t.type({
   projectName: t.string,
+  triggerRunnerPublicIp: t.string,
   provider: ProviderContext,
 })
 export type IContext = t.TypeOf<typeof Context>

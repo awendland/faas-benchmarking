@@ -3,15 +3,27 @@ let runCount = 0
 const id = require('crypto')
   .randomBytes(16)
   .toString('base64')
+  .replace('==', '')
+
+/////////////
+// Imports //
+/////////////
 
 const http = require('http')
 
+///////////
+// Utils //
+///////////
+
 const delay = ms => new Promise(res => setTimeout(() => res(), ms))
 
-module.exports.handler = async (event, context) => {
-  const triggeredTime = Date.now()
-  const { sleep, webhook } = event.queryStringParameters || {}
-  console.log(
+//////////////////////
+// Standard Handler //
+//////////////////////
+
+module.exports.handler = async args => {
+  const { triggeredTime, requestId, sleep, webhook, ...providerData } = args
+  process.stdout.write(
     `run_count=${runCount++} init_time=${initTime} triggered_time=${triggeredTime} sleep=${sleep}`,
   )
   if (sleep) {
@@ -19,14 +31,13 @@ module.exports.handler = async (event, context) => {
   }
   const body = JSON.stringify({
     id,
+    initTime,
     runCount,
     triggeredTime,
-    initTime,
+    requestId,
     sleep,
-    functionName: context.functionName,
-    functionVersion: context.functionVersion,
-    invokedFunctionArn: context.invokedFunctionArn,
-    awsRequestId: context.awsRequestId,
+    webhook,
+    providerData,
   })
   if (webhook) {
     await new Promise((resolve, reject) => {
@@ -45,6 +56,40 @@ module.exports.handler = async (event, context) => {
       request.end()
     })
   }
+  return body
+}
+
+////////////////////////
+// Trigger Interfaces //
+////////////////////////
+
+/**
+ * Namespace holding handlers for AWS
+ */
+module.exports.aws = {}
+
+/**
+ * Pull interested details out of the AWS context to return to the caller
+ */
+const awsExtractContextDetails = context => ({
+  functionName: context.functionName,
+  functionVersion: context.functionVersion,
+  invokedFunctionArn: context.invokedFunctionArn,
+  awsRequestId: context.awsRequestId,
+})
+
+/**
+ * Handler for AWS API Gateway.
+ *
+ * NOTE: LAMBDA_PROXY configuration is expected.
+ */
+module.exports.aws.https = async (event, context) => {
+  const triggeredTime = Date.now()
+  const body = await module.exports.handler({
+    ...(event.queryStringParameters || {}),
+    ...awsExtractContextDetails(context),
+    triggeredTime,
+  })
   return {
     statusCode: 200,
     headers: {
@@ -52,4 +97,18 @@ module.exports.handler = async (event, context) => {
     },
     body,
   }
+}
+
+/**
+ * Handler for AWS SQS
+ *
+ * NOTE: A batch size of 1 is expected.
+ */
+module.exports.aws.pubsub = async (event, context) => {
+  const triggeredTime = Date.now()
+  const body = await module.exports.handler({
+    ...JSON.parse(event.Records[0].body),
+    ...awsExtractContextDetails(context),
+  })
+  return
 }

@@ -18,7 +18,8 @@ const run = async () => {
   }
   const elapsedTime = Date.now() - startTime
   log(
-    `Took ${elapsedTime}ms for ${numRuns} runs = ${elapsedTime / numRuns}ms/run`,
+    `Took ${elapsedTime}ms for ${numRuns} runs = ${elapsedTime /
+      numRuns}ms/run`,
   )
 }
 

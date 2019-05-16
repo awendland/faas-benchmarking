@@ -28,7 +28,7 @@ export default class PubsubFaasRunner implements IPubsubFaasRunner {
     return this.providerRunner.setup()
   }
 
-  run(): Promise<void> {
+  run() {
     return this.providerRunner.run()
   }
 

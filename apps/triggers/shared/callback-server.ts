@@ -70,7 +70,7 @@ export default class CallbackServer extends EventEmitter {
         })
       })
     })
-    return new Promise((resolve, reject) => {
+    return new Promise(resolve => {
       this.server!.listen(this.port, this.host, () => resolve())
     })
   }

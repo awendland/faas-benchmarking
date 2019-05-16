@@ -70,16 +70,21 @@ ${_.range(this.params.numberOfFunctions)
   .map(
     i => `
   fn${i}:
-    handler: index.handler
+    handler: index.${this.context.provider.name}.pubsub
     memorySize: ${this.params.memorySize}
     timeout: ${this.params.timeout}
     events:
-      - http: post fn${i}`,
+      - sqs:
+          batchSize: 1
+          arn:
+            Fn::GetAtt:
+              - Queue
+              - Arn
   )
   .join('\n')}
 resources:
   Resources:
-    ${queueName}:
+    Queue:
       Type: "AWS::SQS::Queue"
       Properties:
         QueueName: "${queueName}"

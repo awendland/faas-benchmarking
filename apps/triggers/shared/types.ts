@@ -1,13 +1,34 @@
 import * as t from 'io-ts'
-import { IContext } from '../../shared'
+import { FaasResponse, IContext } from '../../shared'
 
 /////////////
 // Runners //
 /////////////
 
+export const ResultEvent = t.type({
+  /**
+   * ms from some epoch (epoch is stable for all events in a run)
+   */
+  startTime: t.number,
+  /**
+   * ms from some epoch (epoch is stable for all events in a run)
+   */
+  endTime: t.number,
+  /**
+   * Response received from the FaaS, parsed as JSON
+   */
+  response: FaasResponse,
+})
+export type IResultEvent = t.TypeOf<typeof ResultEvent>
+
+export const Result = t.type({
+  events: t.array(ResultEvent),
+})
+export type IResult = t.TypeOf<typeof Result>
+
 export type IRunner<Params, TargetInfra> = {
   setup(): Promise<void>
-  run(): Promise<void>
+  run(): Promise<IResult>
   teardown(): Promise<void>
 }
 
