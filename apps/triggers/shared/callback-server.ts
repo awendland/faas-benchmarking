@@ -104,11 +104,12 @@ export default class CallbackServer extends EventEmitter {
     }
     if (didTimeout) {
       console.warn(
-        `Callback Server timed out with ${this.server.requests.length}/${
-          this.params.numberOfMessages
+        `Callback Server timed out with ${this.requests.length}/${
+          numRequests
         } requests seen`,
       )
     }
+    return !didTimeout
   }
 
   /**

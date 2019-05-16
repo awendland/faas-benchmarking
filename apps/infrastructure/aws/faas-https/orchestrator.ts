@@ -6,13 +6,13 @@ import * as t from 'io-ts'
 import * as _ from 'lodash'
 import { dir as createtmpdir, DirectoryResult } from 'tmp-promise'
 import { IContext } from '../../../shared/types'
+import { decodeOrThrow } from '../../../shared/utils'
 import { serverlessBin } from '../shared'
 import { translateToAws, prepareHandlerCodeZip } from '../faas'
 import {
   IHttpsFaasOrchestrator,
   HttpsFaasOrchestratorParams,
   IHttpsFaasOrchestratorParams,
-  decodeOrThrow,
 } from '../../shared'
 
 const execFile = promisify(cp.execFile)

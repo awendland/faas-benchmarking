@@ -52,7 +52,7 @@ module.exports.handler = async args => {
         resp => {
           resp.resume()
           resp.on('error', reject)
-          resp.on('end', resolve())
+          resp.on('end', resolve)
         },
       )
       request.on('timeout', () => {
