@@ -9,6 +9,15 @@ import { decodeOrThrow, tryThenTeardown } from '../shared/utils'
 import PubsubFaasRunner from '../triggers/pubsub/runner'
 import { appendResultFile } from './shared'
 
+type StaticOrDynamicBatch = {
+  numberOfMessagesPerFn: number,
+} | {
+  initialMsgPerSec: number,
+  incrementMsgPerSec?: number | undefined,
+  incrementPeriod?: number | undefined,
+  duration?: number | undefined,
+}
+
 /**
  * Run a batch of pubsub tests. The only limit to batch size is the number
  * of resources that can be created in a given CloudFormation (expressed
@@ -18,15 +27,23 @@ export const runTrialBatch = async ({
   context,
   memorySize,
   numberOfFunctions,
-  numberOfMessagesPerFn,
+  functionSleep,
   OrchestratorModule,
+  ...args
 }: {
   context: IContext
   memorySize: IFaasSize
   numberOfFunctions: number
-  numberOfMessagesPerFn: number
+  functionSleep?: number | undefined,
   OrchestratorModule: IOrchestratorModule
-}) => {
+} & StaticOrDynamicBatch) => {
+  const {
+    numberOfMessagesPerFn,
+    initialMsgPerSec,
+    incrementMsgPerSec,
+    incrementPeriod,
+    duration,
+  } = args as any
   const params = decodeOrThrow(
     {
       numberOfFunctions,
@@ -47,8 +64,11 @@ export const runTrialBatch = async ({
       const trigger = new PubsubFaasRunner(
         context,
         {
-          numberOfMessages: numberOfMessagesPerFn,
-          faasParams: {} as any,
+          initialMsgPerSec: initialMsgPerSec || numberOfMessagesPerFn,
+          incrementMsgPerSec: incrementMsgPerSec || 0,
+          incrementPeriod: incrementPeriod || 0,
+          duration: duration,
+          faasParams: { sleep: functionSleep } as any,
         },
         { queue },
       )

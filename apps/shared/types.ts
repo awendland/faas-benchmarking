@@ -38,6 +38,7 @@ export const FaasResponse = t.intersection([
     initTime: t.number,
     runCount: t.number,
     triggeredTime: t.number,
+    processingTime: t.number,
     providerData: t.any,
   }),
 ])

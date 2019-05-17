@@ -79,6 +79,10 @@ provider:
   runtime: ${translateToAws.runtime(this.params.runtime)}
   stackName: ${this.context.projectName}
   apiName: ${this.context.projectName}
+custom:
+  splitStacks:
+    perFunction: false
+    perType: true
 package:
   artifact: ${packageZip}
 functions:

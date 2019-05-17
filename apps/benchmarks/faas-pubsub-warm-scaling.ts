@@ -3,7 +3,7 @@ import { handleArgs, prepareContext } from './shared'
 import { runTrialBatch } from './faas-pubsub-shared'
 
 ////////////////
-// Cold Start //
+// Warm Scaling //
 ////////////////
 
 const run = async () => {
@@ -23,10 +23,13 @@ const run = async () => {
     for (let i = 0; i < (argv.loops || 1); i++) {
       await runTrialBatch({
         // Cloudformation max is 200 resources which is ~10 pubsub fns
-        numberOfFunctions: 30,
-        numberOfMessagesPerFn: 1,
+        numberOfFunctions: 1,
+        initialMsgPerSec: 50,
+        incrementMsgPerSec: 50,
+        incrementPeriod: 10 * 1e3,
+        duration: 20 * 10 * 1e3
         memorySize: memorySize,
-        functionSleep: argv.functionSleep,
+        functionSleep: argv.functionSleep || 5,
         context,
         OrchestratorModule,
       }).catch(console.error)

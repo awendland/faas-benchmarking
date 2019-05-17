@@ -19,12 +19,13 @@ const run = async () => {
       memorySize,
       provider,
       argv,
-    }),
+    })
     for (let i = 0; i < (argv.loops || 1); i++) {
       await runTrialBatch({
         numberOfFunctions: 1,
         numberOfMessagesPerFn: 1000,
         memorySize: memorySize,
+        functionSleep: argv.functionSleep,
         context,
         OrchestratorModule,
       }).catch(console.error)

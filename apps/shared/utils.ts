@@ -34,6 +34,9 @@ export const tryThenTeardown = async (
   try {
     await fn()
   } catch (e) {
+    // FIX: this error should be propagating to higher levels and logging,
+    // but it isn't
+    console.error(`tryThenTeardown`, e)
     throw e
   } finally {
     await resource.teardown()

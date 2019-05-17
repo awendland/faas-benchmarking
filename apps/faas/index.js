@@ -35,6 +35,7 @@ module.exports.handler = async args => {
     initTime,
     runCount,
     triggeredTime,
+    processingTime: Date.now() - triggeredTime, // Doesn't capture all processing time
     requestId,
     sleep,
     webhook,
