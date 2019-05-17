@@ -70,7 +70,9 @@ export default class AwsPubsubFaasRunner implements IPubsubFaasRunner {
   async run(): Promise<IResult> {
     const MessageBody = JSON.stringify({
       ...this.params.faasParams,
-      webhook: `http://${this.context.triggerRunnerPublicIp}:${this.server.port}`,
+      webhook: `http://${this.context.triggerRunnerPublicIp}:${
+        this.server.port
+      }`,
       requestId: 'REPLACE_ID',
     })
     const message = (id: string) => ({
@@ -80,7 +82,7 @@ export default class AwsPubsubFaasRunner implements IPubsubFaasRunner {
     console.debug(
       `Sending ${
         this.params.numberOfMessages
-      } messages to SQS in batches of ${PUBSUB_BATCH_SIZE}`,
+      } messages in batches of ${PUBSUB_BATCH_SIZE} to ${this.targets.queue}`,
     )
     await Promise.all(
       _.chunk(
@@ -110,7 +112,7 @@ export default class AwsPubsubFaasRunner implements IPubsubFaasRunner {
       }),
     )
     const callbackTimeout = 120 * 1000
-    const didSeeRequests = await this.server.waitUntil({
+    await this.server.waitUntil({
       numRequests: this.params.numberOfMessages,
       timeout: callbackTimeout,
     })
@@ -129,6 +131,7 @@ export default class AwsPubsubFaasRunner implements IPubsubFaasRunner {
   }
 
   async teardown(): Promise<void> {
+    this.server.stop()
     /* noop */
   }
 }

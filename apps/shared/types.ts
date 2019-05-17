@@ -1,5 +1,16 @@
 import * as t from 'io-ts'
 
+/////////////
+// General //
+/////////////
+
+/**
+ * An object that can be torn down.
+ */
+export type ITeardownable = {
+  teardown: () => Promise<void>
+}
+
 ///////////////
 // Providers //
 ///////////////

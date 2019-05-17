@@ -56,7 +56,7 @@ module.exports.handler = async args => {
         },
       )
       request.on('timeout', () => {
-        request.abort();
+        request.abort()
       })
       request.write(body)
       request.end()

@@ -6,7 +6,7 @@ def calc_latency(response, method="req_rtt"):
         client_trigger_time = response['timings']['upload'] - tcp_latency
         return response['json']['triggeredTime'] - client_trigger_time
     elif method == "req_rtt":
-        latency = response['response'] - response['upload'] - response['sleep_dur']
+        latency = response['endTime'] - response['startTime'] - response['processingTime']
         return latency
     elif method == "req_upload_rtt":
         latency = int(response['timings']['response'] - response['timings']['upload'])
@@ -26,19 +26,9 @@ def load_data_files(files):
         print (data_file)
         with open(data_file, 'r') as file:
             data = json.load(file)
-            df = []
-            try:
-                df['params'] = json.loads(data['params'])
-            except json.JSONDecodeError:
-                df['params'] = {}
-
-            responses = []
-            for r in data['responses']:
-                try:
-                    r.append(json.loads(r))
-                except json.JSONDecodeError:
-                    continue
-            df['responses'] = responses
+            df = {}
+            df['params'] = data['params']
+            df['responses'] = data['responses']
 
             # if data['errors']:
             #     print('{} error responses'.format(len(data['errors'])))

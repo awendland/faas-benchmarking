@@ -1,5 +1,6 @@
 import * as t from 'io-ts'
 import { failure } from 'io-ts/lib/PathReporter'
+import { ITeardownable } from './types'
 
 /**
  * Decode a value using an io-ts type definition, and return the decoded value
@@ -21,3 +22,20 @@ export function decodeOrThrow<A, O, I>(value: I, codec: t.Type<A, O, I>): A {
  */
 export const sleep = (ms: number) =>
   new Promise(res => setTimeout(() => res(), ms))
+
+/**
+ * Run a closure and teardown a resource upon it's completion, regardless of if
+ * an error was thrown
+ */
+export const tryThenTeardown = async (
+  resource: ITeardownable,
+  fn: () => Promise<void>,
+) => {
+  try {
+    await fn()
+  } catch (e) {
+    throw e
+  } finally {
+    await resource.teardown()
+  }
+}

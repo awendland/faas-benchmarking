@@ -104,9 +104,9 @@ export default class CallbackServer extends EventEmitter {
     }
     if (didTimeout) {
       console.warn(
-        `Callback Server timed out with ${this.requests.length}/${
-          numRequests
-        } requests seen`,
+        `Callback Server timed out with ${
+          this.requests.length
+        }/${numRequests} requests seen`,
       )
     }
     return !didTimeout
@@ -117,12 +117,14 @@ export default class CallbackServer extends EventEmitter {
    */
   stop(): Promise<void> {
     if (this.server) {
+      console.debug(`Stopping Callback Server...`)
       this.server.removeAllListeners('request')
       return new Promise((resolve, reject) => {
         this.server!.close(() => resolve())
         this.server = null
       })
     }
+    console.debug(`Callback Server has already been stopped`)
     return Promise.resolve()
   }
 }

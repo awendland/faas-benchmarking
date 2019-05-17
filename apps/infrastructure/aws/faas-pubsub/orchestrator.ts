@@ -133,9 +133,9 @@ ${_.range(this.params.numberOfFunctions)
     if (!listQueueData || !listQueueData.QueueUrls) {
       throw new Error(`Unable to retrieve queues`)
     }
-    return {
-      queues: listQueueData.QueueUrls,
-    }
+    const queues = listQueueData.QueueUrls
+    console.debug(`Queues:\n${queues.map(q => `  ${q}`).join('\n')}`)
+    return { queues }
   }
 
   async teardown() {

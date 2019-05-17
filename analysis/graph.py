@@ -27,11 +27,14 @@ def latency_rate(data_file, out_prefix, percentiles="5,95", latency="req_rtt"):
         y_percs[0].append(avg - np.percentile(y_tmp[i], percs[0]))
         y_percs[1].append(np.percentile(y_tmp[i], percs[1]) - avg)
         y_avg.append(avg)
-        x_time.append(params['init_rate'] + i*params['increment'])
+        x_time.append(params['incrementPeriod'] + i*params['incrementSize'])
 
     plt.errorbar(x_time, y_avg, yerr=y_percs, fmt='go-')
     plt.xlabel('Requests per Second', fontsize=18)
     plt.ylabel('Latency (ms)', fontsize=16)
+
+    plt.grid(True)
+
     plt.title(params['triggerType'] + ' Latency at Scale (5, 95 percentile bars)')
     plt.xticks(range(last_round+1))
     plt.show()
@@ -43,10 +46,12 @@ def latency_rate(data_file, out_prefix, percentiles="5,95", latency="req_rtt"):
 # multi is either "vm_size" or "trigger"
 def cdf(data_files, out_prefix, filter="all", latency="req_rtt", multi="vm_size"):
     data_files.sort(key=lambda d: d['params']['memorySize'])
-    fig = plt.figure(figsize=(10,5))
+    fig = plt.figure(figsize=(12,5))
     ax = plt.subplot(111)
-    burst_color = cm.get_cmap('nipy_spectral', len(data_files))
+    # burst_color = cm.get_cmap('nipy_spectral', len(data_files))
     vm_set = set()
+    min_x = 0
+    max_x = 0
     for idx,responses in enumerate(data_files):
         params = responses['params']
         responses = responses['responses']
@@ -70,9 +75,11 @@ def cdf(data_files, out_prefix, filter="all", latency="req_rtt", multi="vm_size"
         num_points = len(filtered_resp)
         x, y = [0], [0]
 
-        for i in range(0, num_points):
+        for i in range(num_points):
             x.append(filtered_resp[i])
-            y.append(float(i) / num_points * 100)
+            max_x = max(max_x, filtered_resp[i])
+            min_x = min(min_x, filtered_resp[i])
+            y.append(float(i) / (num_points-1) * 100)
 
         if multi == "vm_size":
             label = '{} MB VM (n={})'.format(params['memorySize'], len(filtered_resp))
@@ -81,11 +88,11 @@ def cdf(data_files, out_prefix, filter="all", latency="req_rtt", multi="vm_size"
         else:
             label = 'n={}'.format(len(filtered_resp))
 
-        print (np.mean(x))
         ax.plot(x, y,
-                '-' if idx % 2 == 0 else '--',
+                '-',
                 label=label,
-                color=burst_color(idx))
+                # color=burst_color(idx))
+                color='C'+str(idx))
 
     test_type = ''
     if filter=="cold":
@@ -96,7 +103,11 @@ def cdf(data_files, out_prefix, filter="all", latency="req_rtt", multi="vm_size"
     plt.xlabel('Latency (ms, {})'.format(latency))
     plt.ylabel('% of Requests')
 
-    ax.legend()
+    plt.grid(True)
+    plt.xticks(np.arange(0, 500*(max_x//500+1), step=500))
+    plt.yticks(np.arange(0, 120, step=20))
+
+    ax.legend(loc='best', bbox_to_anchor=(0.5, 0., 0.5, 0.5))
     if multi == "vm_size":
         if len(data_files) > 1:
             title = test_type + 'Start Latency with Varying Request Sizes'
@@ -112,7 +123,7 @@ def cdf(data_files, out_prefix, filter="all", latency="req_rtt", multi="vm_size"
             plt.title(title)
             plt.savefig("-".join(out_prefix.split("-")[:-2]) + "_mTRIG_CDF_" + filter + '.png')
         else:
-            title = test_type + 'Start Latency'
+            title = data_files[0]['params']['triggerType'].capitalize() + " " + test_type + 'Start Latency'
             plt.title(title)
             plt.savefig(out_prefix + "_TRIG_CDF_" + filter + ".png")
     else:
@@ -139,6 +150,7 @@ def cold_per_burst(data_files, out_prefix, interval=5):
         new_vm_count = []
         all_vm_count = []
         expct = []
+        run_times = []
 
         cur_tick = 0
 
@@ -153,6 +165,7 @@ def cold_per_burst(data_files, out_prefix, interval=5):
                 cur_req = data_file.pop()
                 counter += 1
                 vm_set.add(cur_req['id'])
+                run_times.add(cur_req['processingTime'])
                 if cur_req['runCount'] == 1:
                     if cur_req['triggeredTime'] - cur_req['initTime'] > calc_latency(cur_req):
                         pre_warms += 1
@@ -160,7 +173,8 @@ def cold_per_burst(data_files, out_prefix, interval=5):
                     else:
                         true_cold += 1
 
-            expct.append(file_params['sleep_dur'] * file_params['inc_rate']*cur_tick)
+
+            expct.append(sum(run_times)/len(run_times) * file_params['incrementPeriod']*cur_tick)
             warm_count.append(pre_warms)
             new_vm_count.append(pre_warms + true_cold)
             all_vm_count.append(len(vm_set))
@@ -174,6 +188,9 @@ def cold_per_burst(data_files, out_prefix, interval=5):
 
     plt.xlabel('Time', fontsize=16)
     plt.ylabel('# of Requests', fontsize=16)
+
+    plt.grid(True)
+
     plt.title('VM Count vs Scaling ' + params['triggerType'] + ' Requests')
     ax.legend()
     plt.show()
@@ -186,13 +203,13 @@ def cold_per_burst(data_files, out_prefix, interval=5):
 def add_ticks(result):
     responses = result['responses']
     params = result['params']
-    increment = params['inc_rate']
+    increment = params['incrementPeriod']
     if increment:
         return result
-    responses = sorted(responses, lambda r : r['response'])
-    first_time = responses[0]['response']
+    responses = sorted(responses, lambda r : r['endTime'])
+    first_time = responses[0]['endTime']
     for i, r in enumerate(responses):
-        responses[i]['tick'] = (r['response'] - first_time)//(increment * 1000)
+        responses[i]['tick'] = (r['endTime'] - first_time)//(increment * 1000)
     result['responses'] = responses
     return result
 

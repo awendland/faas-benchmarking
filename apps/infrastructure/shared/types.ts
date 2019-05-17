@@ -24,13 +24,14 @@ export const InfraType = t.keyof({
 })
 export type IInfraType = t.TypeOf<typeof InfraType>
 
-export const FaasSize = t.keyof({
+export const FaasSizes = {
   '128': null,
   '256': null,
   '512': null,
   '1024': null,
   '2048': null,
-})
+}
+export const FaasSize = t.keyof(FaasSizes)
 export type IFaasSize = t.TypeOf<typeof FaasSize>
 
 export const FaasRuntime = t.keyof({
