@@ -52,14 +52,19 @@ const runTrial = async (context: IContext, memorySize: IFaasSize) => {
         },
         { queue },
       )
-      await trigger.setup()
-      const results = await trigger.run()
-      await testAppendFile(context.projectName, results)
-      // Handle results
-      await trigger.teardown()
+      try {
+        await trigger.setup()
+        const results = await trigger.run()
+        await testAppendFile(context.projectName, results)
+      } catch (e) {
+        throw e
+      } finally {
+        await trigger.teardown()
+      }
     }
   } catch (e) {
     console.error(e)
+  } finally {
     await orchestrator.teardown()
   }
 }

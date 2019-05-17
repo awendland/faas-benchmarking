@@ -63,6 +63,7 @@ export default class AwsPubsubFaasRunner implements IPubsubFaasRunner {
 
   async setup(): Promise<void> {
     this.server.port = await getPort({ port: 3000 })
+    console.debug(`Starting Callback Server on port=${this.server.port}`)
     await this.server.start()
   }
 
