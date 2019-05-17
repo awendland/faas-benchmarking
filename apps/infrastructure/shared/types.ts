@@ -5,6 +5,11 @@ import { IContext } from '../../shared'
 // Orchestrators //
 ///////////////////
 
+export type IOrchestratorModule = {
+  default: IOrchestratorConstructor
+  ParamsType: t.Type<any, any, any>
+}
+
 export type IOrchestrator<Params, NotableInfra> = {
   setup(): Promise<NotableInfra>
   teardown(): Promise<void>

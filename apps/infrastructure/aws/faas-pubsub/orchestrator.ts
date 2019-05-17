@@ -141,11 +141,13 @@ ${_.range(this.params.numberOfFunctions)
   async teardown() {
     if (this.tmpdir) {
       console.debug(`Running ${serverlessBin} remove`)
+      const startTime = Date.now()
       const { stdout } = await execFile(serverlessBin, [`remove`], {
         cwd: this.tmpdir.path,
       })
       console.debug(stdout)
       await this.tmpdir.cleanup()
+      console.debug(`Teardown in ${(Date.now() - startTime) / 1000} sec`)
     }
   }
 }

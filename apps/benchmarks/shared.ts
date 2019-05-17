@@ -2,11 +2,7 @@ import * as fs from 'fs-extra'
 import * as Path from 'path'
 import minimist from 'minimist'
 import publicIp from 'public-ip'
-import {
-  InfraType,
-  IInfraType,
-  IOrchestratorConstructor,
-} from '../infrastructure/shared'
+import { IInfraType, IFaasSize } from '../infrastructure/shared'
 import { decodeOrThrow } from '../shared/utils'
 import { Provider, IProvider, IContext, Context } from '../shared'
 
@@ -26,13 +22,11 @@ export const handleArgs = ({
   const provider = decodeOrThrow(argv.provider, Provider)
   const orchestratorModule = require('./' +
     Path.join('../infrastructure', provider, infraType, 'orchestrator'))
-  const Orchestrator: IOrchestratorConstructor = orchestratorModule.default
 
   return {
     argv,
     provider,
-    Orchestrator,
-    OrchestratorParamsType: orchestratorModule.ParamsType,
+    OrchestratorModule: orchestratorModule,
   }
 }
 
@@ -41,16 +35,18 @@ export const handleArgs = ({
  */
 export const prepareContext = async ({
   benchmarkType,
+  memorySize,
   provider,
   argv,
 }: {
   benchmarkType: string
+  memorySize: IFaasSize
   provider: IProvider
   argv: any
 }) => {
   return decodeOrThrow(
     {
-      projectName: `${benchmarkType}-${Date.now().toString(36)}`,
+      projectName: `${benchmarkType}-${memorySize}-${Date.now().toString(36)}`,
       triggerRunnerPublicIp:
         argv.triggerRunnerPublicIp || (await publicIp.v4()),
       provider: {
