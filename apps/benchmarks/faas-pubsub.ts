@@ -29,7 +29,7 @@ const orchestratorConstructor: IOrchestratorConstructor =
 const runTrial = async (context: IContext, memorySize: IFaasSize) => {
   const params = decodeOrThrow(
     {
-      numberOfFunctions: 30, // Cloudformation max, perf optimization
+      numberOfFunctions: 10, // Cloudformation max, perf optimization
       memorySize,
       runtime: 'node8',
       sourceDir: __dirname + '/../faas',
@@ -48,6 +48,7 @@ const runTrial = async (context: IContext, memorySize: IFaasSize) => {
         context,
         {
           numberOfMessages: 1,
+          faasParams: {} as any,
         },
         { queue },
       )
@@ -58,8 +59,8 @@ const runTrial = async (context: IContext, memorySize: IFaasSize) => {
       await trigger.teardown()
     }
   } catch (e) {
+    console.error(e)
     await orchestrator.teardown()
-    throw e
   }
 }
 

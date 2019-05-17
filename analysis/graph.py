@@ -44,6 +44,8 @@ def cdf(data_files, out_prefix, filter="all", latency="req_rtt", multi="vm_size"
     burst_color = cm.get_cmap('nipy_spectral', len(data_files))
     vm_set = set()
     for idx,responses in enumerate(data_files):
+        params = responses['params']
+        responses = responses['responses']
         if filter=="cold":
             resp = []
             for response in responses:
@@ -69,7 +71,7 @@ def cdf(data_files, out_prefix, filter="all", latency="req_rtt", multi="vm_size"
             y.append(float(i) / num_points * 100)
 
         if multi=="vm_size":
-            vm_mem_sz = re.search('[0-9a-f]+-(\d+)-[a-z0-9]', responses[0]['json']['functionName']).group(1)
+            vm_mem_sz = 
             label = '{} MB VM (n={})'.format(vm_mem_sz, len(filtered_resp))
         elif mult=="trigger":
             trigger = re.search('-+([A-Z]+[A-Z3]*)', responses[0]['json']['functionName']).group(1)
@@ -77,6 +79,7 @@ def cdf(data_files, out_prefix, filter="all", latency="req_rtt", multi="vm_size"
         else:
             label = 'n={}'.format(len(filtered_resp))
 
+        print (np.mean(x))
         ax.plot(x, y,
                 '-' if idx % 2 == 0 else '--',
                 label=label,
@@ -102,13 +105,16 @@ def cdf(data_files, out_prefix, filter="all", latency="req_rtt", multi="vm_size"
         plt.savefig(out_prefix + "_CDF_" + filter + ".png")
     #return zip(x, y)
 
-# x_axis: ticks
+# x_axis: requests per second
 # y_axis: # of VMs
-def cold_per_burst(data_file, out_prefix, x_axis="Burst Size"):
-    #memory = [128,256,512,1024,2048]
+def cold_per_burst(data_file, out_prefix, interval=5):
+    file_params = data_file['params']
+    data_file = data_file['responses']
     added_burst = [50 for i in range(14*2)]
     fig = plt.figure(figsize=(10,5))
     ax = plt.subplot(111)
+
+    data_file = add_ticks(data_file)
 
     data_file = sorted(data_file, key=lambda r: r['tick'], reverse=True)
     ticks = []
@@ -129,11 +135,11 @@ def cold_per_burst(data_file, out_prefix, x_axis="Burst Size"):
         while data_file and cur_tick == data_file[-1]['tick']:
             cur_req = data_file.pop()
             counter += 1
-            vm_set.add(cur_req['json']['id'])
+            vm_set.add(cur_req['id'])
             if cur_req['json']['runCount'] == 1:
-                if cur_req['json']['triggeredTime'] - cur_req['json']['initTime'] > calc_latency(cur_req):
+                if cur_req['triggeredTime'] - cur_req['initTime'] > calc_latency(cur_req):
                     pre_warms += 1
-                    print((cur_req['json']['triggeredTime'] - cur_req['json']['initTime'], calc_latency(cur_req)))
+                    print((cur_req['triggeredTime'] - cur_req['initTime'], calc_latency(cur_req)))
                 else:
                     true_cold += 1
 
@@ -158,6 +164,19 @@ def cold_per_burst(data_file, out_prefix, x_axis="Burst Size"):
     plt.show()
     plt.savefig(out_prefix + "_CPB" + '.png')
 
+
+def add_ticks(result):
+    responses = result['responses']
+    params = result['params']
+    increment = params['inc_rate']
+    if increment:
+        return result
+    responses = sorted(responses, lambda r : r['response'])
+    first_time = responses[0]['response']
+    for i, r in enumerate(responses):
+        responses[i]['tick'] = (r['response'] - first_time)//(increment * 1000)
+    result['responses'] = responses
+    return result
 
 if __name__== "__main__":
     parser = argparse.ArgumentParser()
