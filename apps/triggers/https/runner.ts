@@ -84,10 +84,6 @@ export default class HttpsRunner
 
   async setup() {}
 
-  async runOne(): Promise<IResult> {
-    const requests
-  }
-
   async run(): Promise<IResult> {
     const requests: IRequestRecord[] = []
     const cannons: Array<EventEmitter & { stop: () => void }> = []
@@ -187,7 +183,7 @@ export default class HttpsRunner
 
     // Decode results
     const events: IResultEvent[] = requests.map(request => {
-      let faasData
+      let faasData, invalidResponse
       if (request.rawData.length) {
         const httpReq = Buffer.concat(request.rawData)
           .toString('utf8')
@@ -196,14 +192,14 @@ export default class HttpsRunner
           if (httpReq.length === 1) faasData = JSON.parse(httpReq[0])
           else faasData = JSON.parse(httpReq[1])
         } catch (e) {
-          console.error(httpReq)
-          console.error(e)
+          invalidResponse = httpReq.join('\r\n\r\n')
         }
       }
       return {
         startTime: request.startTime,
         endTime: request.endTime,
         response: faasData,
+        invalidResponse,
       }
     })
     return {

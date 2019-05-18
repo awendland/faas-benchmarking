@@ -40,6 +40,10 @@ export const ResultEvent = t.type({
    * Response received from the FaaS, parsed as JSON
    */
   response: FaasResponse,
+  /**
+   * Response received that wasn't valid FaaS JSON
+   */
+  invalidResponse: t.union([t.string, t.undefined]),
 })
 export type IResultEvent = t.TypeOf<typeof ResultEvent>
 

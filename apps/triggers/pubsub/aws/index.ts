@@ -66,6 +66,7 @@ export default class AwsPubsubFaasRunner implements IPubsubFaasRunner {
         startTime: requests.get(faasData.requestId!)!.timeBeforeSdkCall,
         endTime: callbacks.time,
         response: faasData,
+        invalidResponse: undefined,
       }
     })
     return {
