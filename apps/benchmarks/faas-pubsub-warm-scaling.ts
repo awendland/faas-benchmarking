@@ -13,9 +13,9 @@ const run = async () => {
   })
 
   for (const memorySize of Object.keys(FaasSizes) as IFaasSize[]) {
-    console.debug(`Testing cold-start for ${memorySize} MB FaaS`)
+    console.debug(`Testing warm-scaling for ${memorySize} MB FaaS`)
     const context = await prepareContext({
-      benchmarkType: 'cold-start',
+      benchmarkType: 'warm-scaling',
       memorySize,
       provider,
       argv,
@@ -27,7 +27,7 @@ const run = async () => {
         initialMsgPerSec: 50,
         incrementMsgPerSec: 50,
         incrementPeriod: 10 * 1e3,
-        duration: 20 * 10 * 1e3
+        duration: 20 * 10 * 1e3,
         memorySize: memorySize,
         functionSleep: argv.functionSleep || 5,
         context,

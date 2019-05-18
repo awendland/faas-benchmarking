@@ -95,6 +95,11 @@ export default class CallbackServer extends EventEmitter {
     let didTimeout = false
     while (true) {
       await sleep(2000)
+      console.debug(
+        `Callback Server has seen ${
+          this.requests.length
+        }/${numRequests} requests`,
+      )
       if (this.requests.length >= numRequests) break
       const elapsedTime = Date.now() - startTime
       if (elapsedTime > timeout) {

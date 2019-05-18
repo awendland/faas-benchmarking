@@ -38,12 +38,16 @@ export default class AwsPubsubFaasRunner implements IPubsubFaasRunner {
     this.server.port = await getPort({ port: 3000 })
     console.debug(`Starting Callback Server on port=${this.server.port}`)
     await this.server.start()
-    await this.requester.setup()
+    await this.requester.setup({
+      webhook: `http://${this.context.triggerRunnerPublicIp}:${
+        this.server.port
+      }`,
+    })
   }
 
   async run(): Promise<IResult> {
     const requests = await this.requester.run()
-    const callbackTimeout = 2 * 60 * 1000
+    const callbackTimeout = 5 * 60 * 1000
     await this.server.waitUntil({
       numRequests: requests.size,
       timeout: callbackTimeout,

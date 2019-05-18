@@ -9,14 +9,16 @@ import { decodeOrThrow, tryThenTeardown } from '../shared/utils'
 import PubsubFaasRunner from '../triggers/pubsub/runner'
 import { appendResultFile } from './shared'
 
-type StaticOrDynamicBatch = {
-  numberOfMessagesPerFn: number,
-} | {
-  initialMsgPerSec: number,
-  incrementMsgPerSec?: number | undefined,
-  incrementPeriod?: number | undefined,
-  duration?: number | undefined,
-}
+type StaticOrDynamicBatch =
+  | {
+      numberOfMessagesPerFn: number
+    }
+  | {
+      initialMsgPerSec: number
+      incrementMsgPerSec?: number | undefined
+      incrementPeriod?: number | undefined
+      duration?: number | undefined
+    }
 
 /**
  * Run a batch of pubsub tests. The only limit to batch size is the number
@@ -34,7 +36,7 @@ export const runTrialBatch = async ({
   context: IContext
   memorySize: IFaasSize
   numberOfFunctions: number
-  functionSleep?: number | undefined,
+  functionSleep?: number | undefined
   OrchestratorModule: IOrchestratorModule
 } & StaticOrDynamicBatch) => {
   const {
@@ -61,21 +63,24 @@ export const runTrialBatch = async ({
   await tryThenTeardown(orchestrator, async () => {
     const targets = await orchestrator.setup()
     for (const queue of targets.queues) {
-      const trigger = new PubsubFaasRunner(
-        context,
-        {
-          initialMsgPerSec: initialMsgPerSec || numberOfMessagesPerFn,
-          incrementMsgPerSec: incrementMsgPerSec || 0,
-          incrementPeriod: incrementPeriod || 0,
-          duration: duration,
-          faasParams: { sleep: functionSleep } as any,
-        },
-        { queue },
-      )
+      const triggerParams = {
+        initialMsgPerSec: initialMsgPerSec || numberOfMessagesPerFn,
+        incrementMsgPerSec: incrementMsgPerSec || 0,
+        incrementPeriod: incrementPeriod || 0,
+        duration: duration,
+        faasParams: { sleep: functionSleep } as any,
+      }
+      const trigger = new PubsubFaasRunner(context, triggerParams, { queue })
       await tryThenTeardown(trigger, async () => {
         await trigger.setup()
         const results = await trigger.run()
-        await appendResultFile(context.projectName, { memorySize, results })
+        await appendResultFile(context.projectName, {
+          memorySize,
+          results,
+          initRate: triggerParams.initialMsgPerSec,
+          incrementSize: triggerParams.incrementMsgPerSec,
+          incrementPeriod: triggerParams.incrementPeriod,
+        })
       })
     }
   }).catch(console.error)

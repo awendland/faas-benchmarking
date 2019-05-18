@@ -55,10 +55,11 @@ export default class AwsPubsubFaasRequester {
     this.sqs = new aws.SQS({ apiVersion: '2012-11-05' })
   }
 
-  async setup(): Promise<void> {
+  async setup(messageBodyProps: {} = {}): Promise<void> {
     this.messageBody = JSON.stringify({
       ...this.params.faasParams,
       requestId: 'REPLACE_ID',
+      ...messageBodyProps,
     })
   }
 
