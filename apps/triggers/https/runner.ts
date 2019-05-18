@@ -91,7 +91,7 @@ export default class HttpsRunner
             ...rateParams,
             duration: Number.POSITIVE_INFINITY,
             body: this.messageBody,
-            setupClient: client => {
+            setupClient: (client: EventEmitter) => {
               // We assume that 'body' will be triggered (1+ times) and then
               // 'response' once after. This assumption may NOT be true, however,
               // this seems to match http-parser-js's implementation and

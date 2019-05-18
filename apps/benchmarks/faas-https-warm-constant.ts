@@ -1,28 +1,39 @@
-import { IFaasSize, FaasSizes } from '../infrastructure/shared'
+import {
+  IFaasSize,
+  FaasSizes,
+  IHttpsFaasOrchestratorInfra,
+} from '../infrastructure/shared'
 import { handleArgs, prepareContext } from './shared'
-import { runTrialBatch } from './faas-pubsub-shared'
+import { runTrialBatchGen } from './faas-shared'
+import HttpsRunner from '../triggers/https/runner'
 
 ///////////////////
 // Warm Constant //
 ///////////////////
 
-const run = async () => {
+export const runTrialBatch = runTrialBatchGen({
+  targetIterator: (infra: IHttpsFaasOrchestratorInfra) =>
+    infra.urls.map(url => ({ url })),
+  Runner: HttpsRunner,
+})
+
+export const run = async () => {
   const { argv, provider, OrchestratorModule } = handleArgs({
     processArgv: process.argv,
-    infraType: 'faas-pubsub',
+    infraType: 'faas-https',
   })
 
   for (const memorySize of Object.keys(FaasSizes) as IFaasSize[]) {
-    console.debug(`Testing pubsub-warm-constant for ${memorySize} MB FaaS`)
+    console.debug(`Testing https-warm-constant for ${memorySize} MB FaaS`)
     const context = await prepareContext({
-      benchmarkType: 'pubsub-warm-constant',
+      benchmarkType: 'https-warm-constant',
       memorySize,
       provider,
       argv,
     })
     for (let i = 0; i < (argv.loops || 1); i++) {
       await runTrialBatch({
-        // Cloudformation max is 200 resources which is ~10 pubsub fns
+        // Cloudformation max is 200 resources which is ~10 https fns
         numberOfFunctions: 1,
         initialMsgPerSec: 50,
         incrementMsgPerSec: 0,
