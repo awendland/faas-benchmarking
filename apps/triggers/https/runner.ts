@@ -1,10 +1,28 @@
 import * as t from 'io-ts'
-import autocannon from 'autocannon'
+import * as tls from 'tls'
+import { URL } from 'url'
+const autocannon = require('autocannon')
 import { IContext, IFaasResponse, IFaasParams } from '../../shared/types'
-import { IHttpsRunnerParams, IHttpsRunnerTargets } from './types'
+import {
+  IHttpsRunnerParams,
+  IHttpsRunnerTargets,
+  HttpsRunnerTargets,
+  HttpsRunnerParams,
+} from './types'
 import { sleep } from '../../shared/utils'
 import { EventEmitter } from 'events'
 import { IResultEvent, IRunner, IResult } from '../shared'
+
+/*
+ * So that this module conforms to:
+ * {
+ *  default: IOrchestratorConstructor,
+ *  ParamsType: typeof default.params,
+ *  TargetsType: typeof default.targets,
+ * }
+ */
+export const ParamsType = HttpsRunnerParams
+export const TargetsType = HttpsRunnerTargets
 
 ////////////////////////
 // Autocannon Helpers //
@@ -13,7 +31,9 @@ import { IResultEvent, IRunner, IResult } from '../shared'
 export const balanceConnectionPipelining = (requestsPerSecond: number) => {
   // assert(connections * connectionRate == requestsPerSecond)
   const PIPELINE_TARGET = 10
-  const connections = Math.max(requestsPerSecond / PIPELINE_TARGET, 200)
+  let connections = Math.min(requestsPerSecond / PIPELINE_TARGET, 200)
+  // Fallback to 1:1 connection:request mapping if non-integers pop up
+  if (Math.floor(connections) !== connections) connections = requestsPerSecond
   return {
     connections,
     pipelining: requestsPerSecond / connections,
@@ -67,16 +87,17 @@ export default class HttpsRunner
   async run(): Promise<IResult> {
     const requests: IRequestRecord[] = []
     const cannons: Array<EventEmitter & { stop: () => void }> = []
+    ;(tls as any).DEFAULT_ECDH_CURVE = 'auto'
 
     for (let period = 0; period < this.params.numberOfPeriods; ++period) {
       const periodStart = Date.now()
 
       // Setup a cannon to handle new capacity if need be
-      if (this.params.incrementMsgPerSec) {
+      if (period === 0 || this.params.incrementMsgPerSec) {
         const rateParams = balanceConnectionPipelining(
           period === 0
             ? this.params.initialMsgPerSec
-            : this.params.incrementMsgPerSec,
+            : this.params.incrementMsgPerSec!,
         )
         console.debug(
           `Starting new autocannon with connections=${
@@ -85,43 +106,48 @@ export default class HttpsRunner
             this.targets.url
           }`,
         )
-        const cannon = autocannon(
-          {
-            url: this.targets.url,
-            ...rateParams,
-            duration: Number.POSITIVE_INFINITY,
-            body: this.messageBody,
-            setupClient: (client: EventEmitter) => {
-              // We assume that 'body' will be triggered (1+ times) and then
-              // 'response' once after. This assumption may NOT be true, however,
-              // this seems to match http-parser-js's implementation and
-              // the definition of HTTP pipelining.
-              const rawData: Buffer[] = []
-              client.on('body', (body: Buffer) => {
-                rawData.push(body)
-              })
-              client.on(
-                'response',
-                (
-                  statusCode: number,
-                  resBytes: number,
-                  responseTime: number,
-                ) => {
-                  // Create a synthetic endTime and startTime, given the responseTime
-                  const endTime = Date.now()
-                  const startTime = endTime - responseTime
-                  requests.push({
-                    startTime,
-                    endTime,
-                    rawData,
-                  })
-                },
-              )
-            },
+        const autocannonArgs = {
+          url: this.targets.url,
+          method: 'POST',
+          servername: new URL(this.targets.url).hostname,
+          ...rateParams,
+          duration: 24 * 60 * 60, // 1 day (some non-overflowing but absurdly large number)
+          // If only sending one round of connections, then impose a maxOverallRequests
+          // so the 'done' event actually fires.
+          maxOverallRequests:
+            this.params.numberOfPeriods === 1
+              ? this.params.incrementMsgPerSec
+              : undefined,
+          body: this.messageBody,
+          setupClient: (client: EventEmitter) => {
+            // We assume that 'body' will be triggered (1+ times) and then
+            // 'response' once after. This assumption may NOT be true, however,
+            // this seems to match http-parser-js's implementation and
+            // the definition of HTTP pipelining.
+            let rawData: Buffer[] = []
+            client.on('body', (body: Buffer) => {
+              rawData.push(body)
+            })
+            client.on(
+              'response',
+              (statusCode: number, resBytes: number, responseTime: number) => {
+                // Create a synthetic endTime and startTime, given the responseTime
+                const endTime = Date.now()
+                const startTime = endTime - Math.ceil(responseTime)
+                requests.push({
+                  startTime,
+                  endTime,
+                  rawData,
+                })
+                rawData = []
+              },
+            )
           },
-          () => {},
-        )
-        cannons.push(cannon as any)
+        }
+        const cannon = autocannon(autocannonArgs, () => {})
+        cannon.on('error', console.log)
+        cannon.on('reqError', console.log)
+        cannons.push(cannon)
       }
 
       if (this.params.incrementPeriod) {
@@ -132,7 +158,7 @@ export default class HttpsRunner
     }
 
     // Stop all cannons
-    const cannonResults = Promise.all(
+    const cannonResultsP = Promise.all(
       cannons.map(
         c =>
           new Promise(resolve => {
@@ -140,18 +166,32 @@ export default class HttpsRunner
           }),
       ),
     )
-    cannons.forEach(c => c.stop())
+    if (this.params.numberOfPeriods !== 1) {
+      console.debug(`Terminating autocannons`)
+      cannons.forEach(c => c.stop())
+    }
+    const cannonResults = await cannonResultsP
     console.debug(
-      `Average rps from autocannons: ${(await cannonResults).map(
+      `Average rps from autocannons: ${cannonResults.map(
         (r: any) => r.requests.average,
+      )}`,
+    )
+    console.debug(
+      `Number of requests sent from autocannons: ${cannonResults.map(
+        (r: any) => r.requests.sent,
       )}`,
     )
 
     // Decode results
     const events: IResultEvent[] = requests.map(request => {
-      const faasData: IFaasResponse = JSON.parse(
-        Buffer.concat(request.rawData).toString('utf8'),
-      )
+      let faasData
+      if (request.rawData.length) {
+        const httpReq = Buffer.concat(request.rawData)
+          .toString('utf8')
+          .split('\r\n\r\n')
+        if (httpReq.length === 1) faasData = JSON.parse(httpReq[0])
+        else faasData = JSON.parse(httpReq[1])
+      }
       return {
         startTime: request.startTime,
         endTime: request.endTime,

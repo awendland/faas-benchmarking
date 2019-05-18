@@ -28,8 +28,8 @@ def latency_rate(data_files, out_prefix, percentiles="5,95"):
         to_graph.setdefault(params['triggerType'], {}).setdefault(params['memorySize'],{}).setdefault('n', 0)
         to_graph[params['triggerType']][params['memorySize']]['n'] += 1
 
-    for t, trigger in enumerate(to_graph.keys()):
-        for m, mem_sz in enumerate(to_graph[trigger]):
+    for t, trigger in enumerate(sorted(to_graph.keys())):
+        for m, mem_sz in enumerate(sorted(to_graph[trigger])):
             y_percs, y_avg, x_time = [[],[]], [], []
             percs = [int(s) for s in percentiles.split(",")]
             for tick in sorted(to_graph[trigger][mem_sz]['y_tmp'].keys()):
@@ -60,7 +60,7 @@ def latency_rate(data_files, out_prefix, percentiles="5,95"):
 # y_axis: percent
 # expects function name like: cold-start-911c-1024-node8-API
 # multi is either "vm_size" or "trigger"
-def cdf(data_files, out_prefix, filter="all", latency="req_rtt", multi="vm_size"):
+def cdf(data_files, out_prefix, filter="all", multi="memorySize"):
     data_files.sort(key=lambda d: d['params']['memorySize'])
     fig = plt.figure(figsize=(12,5))
     ax = plt.subplot(111)
@@ -68,7 +68,10 @@ def cdf(data_files, out_prefix, filter="all", latency="req_rtt", multi="vm_size"
     min_x = float("inf")
     max_x = -float("inf")
     max_runcount = 0
-    for idx,responses in enumerate(data_files):
+
+    to_graph = {}
+
+    for responses in data_files:
         params = responses['params']
         responses = responses['responses']
         if filter=="cold":
@@ -84,11 +87,13 @@ def cdf(data_files, out_prefix, filter="all", latency="req_rtt", multi="vm_size"
                 if response['runCount'] > 1:
                     resp.append(response)
             filtered_resp = resp
-            print(max_runcount)
         else:
             filtered_resp = responses
 
-        filtered_resp = sorted(map(lambda r: (calc_latency(r, method=latency)), filtered_resp))
+        to_graph[params[multi]] = to_graph.setdefault(params[multi], []) + filtered_resp
+
+    for idx, m in enumerate(sorted(to_graph.keys())):
+        filtered_resp = sorted(map(lambda r: (calc_latency(r)), to_graph[m]))
 
         num_points = len(filtered_resp)
         x, y = [0,0], [0,0]
@@ -100,45 +105,45 @@ def cdf(data_files, out_prefix, filter="all", latency="req_rtt", multi="vm_size"
             y.append((i+1) / num_points * 100)
         x[1] = min_x
 
-        if multi == "vm_size":
-            label = '{} MB VM (n={})'.format(params['memorySize'], len(filtered_resp))
-        elif multi == "trigger":
-            label = '{} trigger (n={})'.format(params['triggerType'], len(filtered_resp))
+        if multi == "memorySize":
+            label = '{} MB VM (n={})'.format(m, len(filtered_resp))
         else:
-            label = 'n={}'.format(len(filtered_resp))
+            label = '{} trigger (n={})'.format(m, len(filtered_resp))
 
         ax.plot(x, y,
                 '-',
                 label=label,
                 color='C'+str(idx))
+
     test_type = ''
     if filter=="cold":
         test_type="Cold "
     elif filter=="warm":
         test_type="Warm "
 
-    plt.xlabel('Latency (ms, {})'.format(latency))
+    plt.xlabel('Latency (ms)')
     plt.ylabel('% of Requests')
 
     plt.grid(True)
-    plt.xticks(np.arange(0, 10000*(max_x//10000+2), step=10000))
+    # tunable to change axes
+    plt.xticks(np.arange(0, 100*(max_x//100+2), step=100))
     plt.yticks(np.arange(0, 120, step=20))
 
-    ax.legend(loc='lower right', bbox_to_anchor=(1.5,0))
-    if multi == "vm_size":
+    ax.legend(loc='lower right')
+    if multi == "memorySize":
         if len(data_files) > 1:
-            title = test_type + 'Start Latency with Varying Request Sizes'
+            title = data_files[0]['params']['triggerType'] + ' ' + test_type + 'Start Latency with Varying Request Sizes'
             plt.title(title)
-            plt.savefig("-".join(out_prefix.split("-")[:-2]) + "_mSZ_CDF_" + filter + '.png')
+            plt.savefig(out_prefix + "_mSZ_CDF_" + filter + '.png')
         else:
-            title = test_type + 'Start Latency'
+            title = data_files[0]['params']['triggerType'] + ' ' + test_type + 'Start Latency'
             plt.title(title)
             plt.savefig(out_prefix + "_SZ_CDF_" + filter + ".png")
-    elif multi == 'trigger':
+    elif multi == 'triggerType':
         if len(data_files) > 1:
             title = test_type + 'Start Latency with Varying Triggers'
             plt.title(title)
-            plt.savefig("-".join(out_prefix.split("-")[:-2]) + "_mTRIG_CDF_" + filter + '.png')
+            plt.savefig(out_prefix + "_mTRIG_CDF_" + filter + '.png')
         else:
             title = data_files[0]['params']['triggerType'].capitalize() + " " + test_type + 'Start Latency'
             plt.title(title)
@@ -156,16 +161,15 @@ def cold_per_burst(data_files, out_prefix, interval=5):
     fig = plt.figure(figsize=(10,5))
     ax = plt.subplot(111)
 
-    reqs = []
+    to_graph = {}
 
-    for idx,data_file in enumerate(data_files):
+    for data_file in data_files:
         data_file = add_ticks(data_file)
-        file_params = data_file['params']
-        data_file = data_file['responses']
+        params = data_file['params']
+        responses = data_file['responses']
 
-        data_file = sorted(data_file, key=lambda r: r['tick'], reverse=True)
+        responses = sorted(responses, key=lambda r: r['tick'], reverse=True)
         ticks = []
-        warm_count = []
         new_vm_count = []
         all_vm_count = []
         expct = []
@@ -173,7 +177,7 @@ def cold_per_burst(data_files, out_prefix, interval=5):
 
         cur_tick = 0
 
-        while data_file:
+        while responses:
             counter = 0
             pre_warms = 0
             true_cold = 0
@@ -181,31 +185,50 @@ def cold_per_burst(data_files, out_prefix, interval=5):
             vm_set = set()
             run_times = []
 
-            while data_file and cur_tick == data_file[-1]['tick']:
-                cur_req = data_file.pop()
+            while responses and cur_tick == responses[-1]['tick']:
+                cur_req = responses.pop()
                 counter += 1
                 vm_set.add(cur_req['id'])
-                run_times.append(cur_req['processingTime'])
                 if cur_req['runCount'] == 1:
                     if cur_req['triggeredTime'] - cur_req['initTime'] > calc_latency(cur_req):
                         pre_warms += 1
+                        print("PREWARM {} {}".format(cur_req['triggeredTime'] - cur_req['initTime'], calc_latency(cur_req)))
                     else:
                         true_cold += 1
 
-            # print(sum(run_times)/max(1,len(run_times))/1000)
-            # expct.append(sum(run_times)/max(1, len(run_times))/1000 * (file_params['initRate']+file_params['incrementSize']*cur_tick))
-            reqs.append(counter)
-            warm_count.append(pre_warms)
-            new_vm_count.append(pre_warms + true_cold)
-            all_vm_count.append(len(vm_set))
-            ticks.append(cur_tick*file_params['incrementPeriod']/1000)
+            to_graph[params['triggerType']][params['memorySize']]['incrementSize'] = params['incrementSize']
+            to_graph[params['triggerType']][params['memorySize']]['incrementPeriod'] = params['incrementPeriod']
+            to_graph.setdefault(params['triggerType'], {}).setdefault(params['memorySize'],{}).setdefault('reqs', {}).setdefault(cur_tick, []).append(counter)
+            to_graph.setdefault(params['triggerType'], {}).setdefault(params['memorySize'],{}).setdefault('new_vm_count', {}).setdefault(cur_tick, []).append(pre_warms + true_cold)
+            to_graph.setdefault(params['triggerType'], {}).setdefault(params['memorySize'],{}).setdefault('all_vm_count', {}).setdefault(cur_tick, []).append(len(vm_set))
             cur_tick += 1
+
+    for t, trigger in enumerate(sorted(to_graph.keys())):
+        for m, mem_sz in enumerate(sorted(to_graph[trigger])):
+            max_tick = 0
+            reqs, reqs_err = [], []
+            new_vm, new_vm_err = [], []
+            all_vm, all_vm_err = [], []
+            for tick in sorted(to_graph[trigger][mem_sz]['reqs'].keys()):
+                reqs.append(np.average(to_graph[trigger][mem_sz]['reqs'][tick]))
+                reqs_err.append(np.std(to_graph[trigger][mem_sz]['reqs'][tick]))
+                max_tick = max(max_tick, tick*to_graph[trigger][mem_sz]['incrementPeriod']/1000)
+            for tick in sorted(to_graph[trigger][mem_sz]['new_vm_count'].keys()):
+                new_vm.append(np.average(to_graph[trigger][mem_sz]['new_vm_count'][tick]))
+                new_vm_err.append(np.std(to_graph[trigger][mem_sz]['new_vm_count'][tick]))
+            for tick in sorted(to_graph[trigger][mem_sz]['all_vm_count'].keys()):
+                all_vm.append(np.average(to_graph[trigger][mem_sz]['all_vm_count'][tick]))
+                all_vm_err.append(np.std(to_graph[trigger][mem_sz]['all_vm_count'][tick]))
+            expct.append(sum(run_times)/max(1, len(run_times))/1000 * (params['initRate']+params['incrementSize']*cur_tick))
+
+        y_tmp = to_graph.setdefault(params['triggerType'], {}).setdefault(params['memorySize'],{}).setdefault('y_tmp', {})
+
 
         # ax.plot(ticks, new_vm_count, '^-', label='new VMs this round', color='C' + str(idx))
         # ax.plot(ticks, warm_count, 'o-', label='pre-warmed VMs (cold latency < VM lifetime)', color='C' + str(idx))
-        ax.plot(ticks, all_vm_count, 'v-', label='total ' + file_params['triggerType'] + ' ' + str(file_params['memorySize']) + ' MB VMs seen (next ' + str(file_params['incrementPeriod']/1000) + ' seconds)', color='C' + str(idx))
-        # ax.plot(ticks, expct, 's-', label='expected ' + file_params['triggerType'] + ' VMs sent', color='C' + str(idx))
-    ax.plot(ticks, reqs, 'h--', label='total requests sent (next ' + str(file_params['incrementPeriod']/1000) + ' seconds)', color='pink')
+        ax.plot(ticks, all_vm_count, 'v-', label='total ' + params['triggerType'] + ' ' + str(params['memorySize']) + ' MB VMs seen (next ' + str(params['incrementPeriod']/1000) + ' seconds)', color='C' + str(idx))
+        # ax.plot(ticks, expct, 's-', label='expected ' + params['triggerType'] + ' VMs sent', color='C' + str(idx))
+    ax.plot(ticks, reqs, 'h--', label='total requests sent (next ' + str(params['incrementPeriod']/1000) + ' seconds)', color='pink')
 
     plt.xlabel('Time', fontsize=16)
     plt.ylabel('Count', fontsize=16)
@@ -252,7 +275,11 @@ if __name__== "__main__":
     extra_args = {s.split("=")[0].replace("--", ""): s.split("=")[1] for s in extra_args_raw}
 
     out_prefix = os.path.splitext(os.path.basename(args.data_file))[0]
-    out_prefix = "pubsub-warm-constant-all"
+
+    if 'name' in extra_args:
+        out_prefix = extra_args['name']
+        print(out_prefix)
+        del extra_args['name']
 
     if args.graph_type == "cdf":
         cdf(data_files, out_prefix, **extra_args)

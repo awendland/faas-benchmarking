@@ -13,6 +13,7 @@ import {
  * {
  *  default: IOrchestratorConstructor,
  *  ParamsType: typeof default.params,
+ *  TargetsType: typeof default.targets,
  * }
  */
 export const ParamsType = PubsubFaasRunnerParams

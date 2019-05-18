@@ -24,7 +24,9 @@ const runnerConstructor: IRunnerConstructor = runnerModule.default
 const params = decodeOrThrow(
   Object.assign(
     {
-      numberOfMessages: 30,
+      initialMsgPerSec: 30,
+      incrementPeriod: 10 * 1e3,
+      numberOfPeriods: 1,
       faasParams: {},
     },
     argv,
