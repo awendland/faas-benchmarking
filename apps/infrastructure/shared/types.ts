@@ -10,7 +10,7 @@ export type IOrchestratorModule = {
   ParamsType: t.Type<any, any, any>
 }
 
-export type IOrchestrator<Params, NotableInfra> = {
+export type IOrchestrator<Params = {}, NotableInfra = {}> = {
   setup(): Promise<NotableInfra>
   teardown(): Promise<void>
 }
@@ -82,4 +82,20 @@ export type IPubsubFaasOrchestratorInfra = {
 export type IPubsubFaasOrchestrator = IOrchestrator<
   IPubsubFaasOrchestratorParams,
   IPubsubFaasOrchestratorInfra
+>
+
+// KV Store FaaS
+
+export const KvstoreFaasOrchestratorParams = t.exact(BaseFaasParams)
+export type IKvstoreFaasOrchestratorParams = t.TypeOf<
+  typeof KvstoreFaasOrchestratorParams
+>
+
+export type IKvstoreFaasOrchestratorInfra = {
+  stores: string[]
+}
+
+export type IKvstoreFaasOrchestrator = IOrchestrator<
+  IKvstoreFaasOrchestratorParams,
+  IKvstoreFaasOrchestratorInfra
 >

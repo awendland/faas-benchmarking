@@ -7,6 +7,7 @@ import {
   IPubsubFaasRequesterTargets,
 } from '../types'
 import { sleep } from '../../../shared/utils'
+import { msgPerSecToPeriod } from '../../shared'
 
 ///////////////////
 // Magic Numbers //
@@ -98,33 +99,31 @@ export default class AwsPubsubFaasRequester {
   }
 
   async run(): Promise<Map<IRequestId, IRequest>> {
-    let id = 0
-    let periodRps = this.params.initialMsgPerSec
+    let periodReqCount = msgPerSecToPeriod(
+      this.params.incrementPeriod,
+      this.params.initialMsgPerSec,
+    )
     const requests = new Map<IRequestId, IRequest>()
 
-    const startTime = Date.now()
-
-    do {
-      // At least one batch of requests should be run, regardless of the duration
+    for (let period = 0; period < this.params.numberOfPeriods; ++period) {
       const periodStart = Date.now()
       console.debug(
-        `Sending ${periodRps} messages in batches of ${PUBSUB_BATCH_SIZE} to ${
+        `Sending ${periodReqCount} messages in batches of ${PUBSUB_BATCH_SIZE} to ${
           this.targets.queue
         }`,
       )
-      const periodRequests = await this.send(periodRps, requests.size)
+      const periodRequests = await this.send(periodReqCount, requests.size)
       for (const [k, v] of periodRequests.entries()) requests.set(k, v)
       if (this.params.incrementPeriod) {
+        periodReqCount += msgPerSecToPeriod(
+          this.params.incrementPeriod,
+          this.params.incrementMsgPerSec,
+        )
         const sleepTime =
           this.params.incrementPeriod - (Date.now() - periodStart)
         await sleep(sleepTime) // TODO this could lead to drift over time
-        periodRps += this.params.incrementMsgPerSec || 0
       }
-    } while (
-      this.params.duration &&
-      Date.now() - startTime < this.params.duration
-    )
-    // Only run one loop if duration is 0
+    }
 
     return requests
   }

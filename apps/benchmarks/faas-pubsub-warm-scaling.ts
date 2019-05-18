@@ -21,14 +21,13 @@ const run = async () => {
       argv,
     })
     for (let i = 0; i < (argv.loops || 1); i++) {
-      const incrementPeriod = 10 * 1e3
       await runTrialBatch({
         // Cloudformation max is 200 resources which is ~10 pubsub fns
         numberOfFunctions: 1,
-        initialMsgPerSec: 50,
-        incrementMsgPerSec: 50,
-        incrementPeriod,
-        duration: 20 * incrementPeriod,
+        initialMsgPerSec: 5,
+        incrementMsgPerSec: 5,
+        incrementPeriod: 10 * 1e3,
+        numberOfPeriods: 20,
         memorySize: memorySize,
         functionSleep: argv.functionSleep || 5000,
         context,

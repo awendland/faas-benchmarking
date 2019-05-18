@@ -8,6 +8,7 @@ import {
 import { decodeOrThrow, tryThenTeardown } from '../shared/utils'
 import PubsubFaasRunner from '../triggers/pubsub/runner'
 import { appendResultFile } from './shared'
+import { msgPerSecToPeriod } from '../triggers/shared'
 
 type StaticOrDynamicBatch =
   | {
@@ -17,7 +18,7 @@ type StaticOrDynamicBatch =
       initialMsgPerSec: number
       incrementMsgPerSec?: number | undefined
       incrementPeriod?: number | undefined
-      duration?: number | undefined
+      numberOfPeriods?: number | undefined
     }
 
 /**
@@ -44,7 +45,7 @@ export const runTrialBatch = async ({
     initialMsgPerSec,
     incrementMsgPerSec,
     incrementPeriod,
-    duration,
+    numberOfPeriods,
   } = args as any
   const params = decodeOrThrow(
     {
@@ -67,7 +68,7 @@ export const runTrialBatch = async ({
         initialMsgPerSec: initialMsgPerSec || numberOfMessagesPerFn,
         incrementMsgPerSec: incrementMsgPerSec || 0,
         incrementPeriod: incrementPeriod || 0,
-        duration: duration,
+        numberOfPeriods: numberOfPeriods || 1,
         faasParams: { sleep: functionSleep } as any,
       }
       const trigger = new PubsubFaasRunner(context, triggerParams, { queue })
@@ -77,8 +78,14 @@ export const runTrialBatch = async ({
         await appendResultFile(context.projectName, {
           memorySize,
           results,
-          initRate: triggerParams.initialMsgPerSec,
-          incrementSize: triggerParams.incrementMsgPerSec,
+          initRate: msgPerSecToPeriod(
+            triggerParams.incrementPeriod,
+            triggerParams.initialMsgPerSec,
+          ),
+          incrementSize: msgPerSecToPeriod(
+            triggerParams.incrementPeriod,
+            triggerParams.incrementMsgPerSec,
+          ),
           incrementPeriod: triggerParams.incrementPeriod,
         })
       })

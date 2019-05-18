@@ -1,24 +1,20 @@
 import * as t from 'io-ts'
 import { FaasParams } from '../../shared/types'
-import { IRunner } from '../shared'
+import { IRunner, BaseRunnerParams } from '../shared'
 
 // Requester
 
-export const PubsubFaasRequesterParams = t.exact(
-  t.type({
-    initialMsgPerSec: t.number,
-    incrementMsgPerSec: t.union([t.number, t.undefined]),
-    incrementPeriod: t.union([t.number, t.undefined]),
-    duration: t.union([t.number, t.undefined]),
-    faasParams: FaasParams,
-  }),
-)
-export type IPubsubFaasRequesterParams = t.TypeOf<typeof PubsubFaasRequesterParams>
+export const PubsubFaasRequesterParams = t.exact(BaseRunnerParams)
+export type IPubsubFaasRequesterParams = t.TypeOf<
+  typeof PubsubFaasRequesterParams
+>
 
 export const PubsubFaasRequesterTargets = t.type({
   queue: t.string,
 })
-export type IPubsubFaasRequesterTargets = t.TypeOf<typeof PubsubFaasRequesterTargets>
+export type IPubsubFaasRequesterTargets = t.TypeOf<
+  typeof PubsubFaasRequesterTargets
+>
 
 export type IPubsubFaasRequester = {}
 

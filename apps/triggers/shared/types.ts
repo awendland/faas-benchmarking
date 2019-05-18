@@ -1,15 +1,25 @@
 import * as t from 'io-ts'
-import { FaasResponse, IContext } from '../../shared'
+import { FaasResponse, IContext, FaasParams } from '../../shared'
 
 export const TriggerType = t.keyof({
   https: null,
   pubsub: null,
+  kvstore: null,
 })
 export type ITriggerType = t.TypeOf<typeof TriggerType>
 
 /////////////
 // Runners //
 /////////////
+
+export const BaseRunnerParams = t.type({
+  initialMsgPerSec: t.number,
+  incrementMsgPerSec: t.union([t.number, t.undefined]),
+  incrementPeriod: t.union([t.number, t.undefined]),
+  numberOfPeriods: t.number,
+  faasParams: FaasParams,
+})
+export type IBaseRunnerParams = t.TypeOf<typeof BaseRunnerParams>
 
 export type IRunnerModule = {
   default: IRunnerConstructor
@@ -54,17 +64,3 @@ export type IRunnerConstructor<
     TargetInfra
   >
 }
-
-// HTTPS FaaS
-
-export const HttpsFaasRunnerParams = t.number
-export type IHttpsFaasRunnerParams = t.TypeOf<typeof HttpsFaasRunnerParams>
-
-export type IHttpsFaasRunnerTargets = {
-  url: string
-}
-
-export type IHttpsFaasRunner = IRunner<
-  IHttpsFaasRunnerParams,
-  IHttpsFaasRunnerTargets
->

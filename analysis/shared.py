@@ -7,6 +7,8 @@ def calc_latency(response, method="req_rtt"):
         return response['json']['triggeredTime'] - client_trigger_time
     elif method == "req_rtt":
         latency = response['endTime'] - response['startTime'] - response['processingTime']
+        if latency < 0:
+            print("error neg req rtt")
         return latency
     elif method == "req_upload_rtt":
         latency = int(response['timings']['response'] - response['timings']['upload'])

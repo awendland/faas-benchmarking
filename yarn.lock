@@ -2734,7 +2734,7 @@ semver-regex@^1.0.0:
   resolved "https://registry.yarnpkg.com/semver-regex/-/semver-regex-1.0.0.tgz#92a4969065f9c70c694753d55248fc68f8f652c9"
   integrity sha1-kqSWkGX5xwxpR1PVUkj8aPj2Usk=
 
-semver@^5.0.3, semver@^5.1.0, semver@^5.7.0:
+semver@^5.0.3, semver@^5.1.0, semver@^5.6.0, semver@^5.7.0:
   version "5.7.0"
   resolved "https://registry.yarnpkg.com/semver/-/semver-5.7.0.tgz#790a7cf6fea5459bac96110b29b60412dc8ff96b"
   integrity sha512-Ya52jSX2u7QKghxeoFGpLwCtGlt7j0oY9DYb5apt9nPlJ42ID+ulTXESnt/qAQcoSERyZ5sl3LDIOw0nAn/5DA==
@@ -2767,6 +2767,15 @@ serve-static@1.13.2:
     escape-html "~1.0.3"
     parseurl "~1.3.2"
     send "0.16.2"
+
+serverless-plugin-split-stacks@^1.7.3:
+  version "1.7.3"
+  resolved "https://registry.yarnpkg.com/serverless-plugin-split-stacks/-/serverless-plugin-split-stacks-1.7.3.tgz#974de2dfbf50938b6d27e6b1b33ba014d713a60e"
+  integrity sha512-JmhxbSCu8KoQd3iRW2Ubl56skvPw+Ai0vG4mcHpIkLDs2ZsftpehDyg52/l+JgsT2g1fYFbzbOGk/c+jgcnm1g==
+  dependencies:
+    lodash "^4.17.5"
+    semver "^5.6.0"
+    throat "^4.1.0"
 
 serverless@1.41.1:
   version "1.41.1"
@@ -3104,6 +3113,11 @@ text-hex@1.0.x:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/text-hex/-/text-hex-1.0.0.tgz#69dc9c1b17446ee79a92bf5b884bb4b9127506f5"
   integrity sha512-uuVGNWzgJ4yhRaNSiubPY7OjISw4sw4E5Uv0wbjp+OzcbmVU/rsT8ujgcXJhn9ypzsgr5vlzpPqP+MBBKcGvbg==
+
+throat@^4.1.0:
+  version "4.1.0"
+  resolved "https://registry.yarnpkg.com/throat/-/throat-4.1.0.tgz#89037cbc92c56ab18926e6ba4cbb200e15672a6a"
+  integrity sha1-iQN8vJLFarGJJua6TLsgDhVnKmo=
 
 through@^2.3.6, through@^2.3.8:
   version "2.3.8"
