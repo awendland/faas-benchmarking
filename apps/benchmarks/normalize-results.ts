@@ -2,32 +2,32 @@ import { IResultEvent } from '../triggers/shared/types'
 import * as fs from 'fs'
 
 export type GraphFormatResponses = {
-  id: string,
-  runCount: number,
-  triggeredTime: number,
-  initTime: number,
-  startTime: number,
-  endTime: number,
-  processingTime: number,
+  id: string
+  runCount: number
+  triggeredTime: number
+  initTime: number
+  startTime: number
+  endTime: number
+  processingTime: number
 }
 
 export type GraphFormat = {
   params: {
-    memorySize: string,
-    triggerType: string,
-    initRate: number | null,
-    incrementSize: number | null,
-    incrementPeriod: number | null,
-  },
+    memorySize: string
+    triggerType: string
+    initRate: number | null
+    incrementSize: number | null
+    incrementPeriod: number | null
+  }
   responses: Array<GraphFormatResponses>
 }
 
 export type BenchmarkFormat = {
-  time: string,
+  time: string
   data: {
-    memorySize: string,
+    memorySize: string
     results: {
-      events: IResultEvent[],
+      events: IResultEvent[]
     }
   }
 }

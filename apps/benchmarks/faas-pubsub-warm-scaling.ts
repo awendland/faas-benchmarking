@@ -13,23 +13,24 @@ const run = async () => {
   })
 
   for (const memorySize of Object.keys(FaasSizes) as IFaasSize[]) {
-    console.debug(`Testing warm-scaling for ${memorySize} MB FaaS`)
+    console.debug(`Testing pubsub-warm-scaling for ${memorySize} MB FaaS`)
     const context = await prepareContext({
-      benchmarkType: 'warm-scaling',
+      benchmarkType: 'pubsub-warm-scaling',
       memorySize,
       provider,
       argv,
     })
     for (let i = 0; i < (argv.loops || 1); i++) {
+      const incrementPeriod = 10 * 1e3
       await runTrialBatch({
         // Cloudformation max is 200 resources which is ~10 pubsub fns
         numberOfFunctions: 1,
         initialMsgPerSec: 50,
         incrementMsgPerSec: 50,
-        incrementPeriod: 10 * 1e3,
-        duration: 20 * 10 * 1e3,
+        incrementPeriod,
+        duration: 20 * incrementPeriod,
         memorySize: memorySize,
-        functionSleep: argv.functionSleep || 5,
+        functionSleep: argv.functionSleep || 5000,
         context,
         OrchestratorModule,
       }).catch(console.error)

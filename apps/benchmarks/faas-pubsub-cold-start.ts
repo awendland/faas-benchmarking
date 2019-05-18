@@ -13,9 +13,9 @@ const run = async () => {
   })
 
   for (const memorySize of Object.keys(FaasSizes) as IFaasSize[]) {
-    console.debug(`Testing cold-start for ${memorySize} MB FaaS`)
+    console.debug(`Testing pubsub-cold-start for ${memorySize} MB FaaS`)
     const context = await prepareContext({
-      benchmarkType: 'cold-start',
+      benchmarkType: 'pubsub-cold-start',
       memorySize,
       provider,
       argv,

@@ -1,11 +1,7 @@
 import * as aws from 'aws-sdk'
 import * as _ from 'lodash'
 import getPort from 'get-port'
-import {
-  IContext,
-  IAwsContext,
-  liftAwsContext,
-} from '../../../shared/types'
+import { IContext, IAwsContext, liftAwsContext } from '../../../shared/types'
 import {
   IPubsubFaasRequesterParams,
   IPubsubFaasRequesterTargets,
@@ -65,7 +61,9 @@ export default class AwsPubsubFaasRequester {
 
   private createMessage(id: string): aws.SQS.SendMessageBatchRequestEntry {
     if (!this.messageBody) {
-      throw new TypeError(`setup() must be called before AwsPubsubFaasRequester can be used`)
+      throw new TypeError(
+        `setup() must be called before AwsPubsubFaasRequester can be used`,
+      )
     }
     return {
       Id: id,
@@ -106,19 +104,26 @@ export default class AwsPubsubFaasRequester {
 
     const startTime = Date.now()
 
-    do { // At least one batch of requests should be run, regardless of the duration
+    do {
+      // At least one batch of requests should be run, regardless of the duration
       const periodStart = Date.now()
       console.debug(
-        `Sending ${periodRps} messages in batches of ${PUBSUB_BATCH_SIZE} to ${this.targets.queue}`,
+        `Sending ${periodRps} messages in batches of ${PUBSUB_BATCH_SIZE} to ${
+          this.targets.queue
+        }`,
       )
-      const periodRequests = await this.send(periodRps)
+      const periodRequests = await this.send(periodRps, requests.size)
       for (const [k, v] of periodRequests.entries()) requests.set(k, v)
       if (this.params.incrementPeriod) {
-        const sleepTime = this.params.incrementPeriod - (Date.now() - periodStart)
+        const sleepTime =
+          this.params.incrementPeriod - (Date.now() - periodStart)
         await sleep(sleepTime) // TODO this could lead to drift over time
         periodRps += this.params.incrementMsgPerSec || 0
       }
-    } while (this.params.duration && Date.now() - startTime < this.params.duration)
+    } while (
+      this.params.duration &&
+      Date.now() - startTime < this.params.duration
+    )
     // Only run one loop if duration is 0
 
     return requests

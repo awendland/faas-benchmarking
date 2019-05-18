@@ -2,9 +2,9 @@ import { IFaasSize, FaasSizes } from '../infrastructure/shared'
 import { handleArgs, prepareContext } from './shared'
 import { runTrialBatch } from './faas-pubsub-shared'
 
-////////////////
-// Warm Start //
-////////////////
+///////////////////
+// Warm Constant //
+///////////////////
 
 const run = async () => {
   const { argv, provider, OrchestratorModule } = handleArgs({
@@ -13,19 +13,24 @@ const run = async () => {
   })
 
   for (const memorySize of Object.keys(FaasSizes) as IFaasSize[]) {
-    console.debug(`Testing pubsub-warm-start for ${memorySize} MB FaaS`)
+    console.debug(`Testing pubsub-warm-constant for ${memorySize} MB FaaS`)
     const context = await prepareContext({
-      benchmarkType: 'pubsub-warm-start',
+      benchmarkType: 'pubsub-warm-constant',
       memorySize,
       provider,
       argv,
     })
     for (let i = 0; i < (argv.loops || 1); i++) {
+      const incrementPeriod = 10 * 1e3
       await runTrialBatch({
+        // Cloudformation max is 200 resources which is ~10 pubsub fns
         numberOfFunctions: 1,
-        numberOfMessagesPerFn: 1000,
+        initialMsgPerSec: 500,
+        incrementMsgPerSec: 0,
+        incrementPeriod,
+        duration: 20 * incrementPeriod,
         memorySize: memorySize,
-        functionSleep: argv.functionSleep,
+        functionSleep: argv.functionSleep || 5000,
         context,
         OrchestratorModule,
       }).catch(console.error)

@@ -16,6 +16,9 @@ import {
 import CallbackServer from '../../shared/callback-server'
 import AwsPubsubFaasRequester from './requester'
 
+// TODO generic-ize this and share it w/ Kvstore runner as well (any
+// runner that needs a Callback Server)
+
 /**
  * Implementation of PubsubFaasRunner for AWS.
  */
@@ -30,7 +33,11 @@ export default class AwsPubsubFaasRunner implements IPubsubFaasRunner {
     public targets: IPubsubFaasRunnerTargets,
   ) {
     this.provider = liftAwsContext(this.constructor.name, this.context)
-    this.requester = new AwsPubsubFaasRequester(this.context, this.params, this.targets)
+    this.requester = new AwsPubsubFaasRequester(
+      this.context,
+      this.params,
+      this.targets,
+    )
     this.server = new CallbackServer()
   }
 
