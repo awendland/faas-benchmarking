@@ -195,14 +195,17 @@ def cold_per_burst(data_files, out_prefix, interval=5):
                         print("PREWARM {} {}".format(cur_req['triggeredTime'] - cur_req['initTime'], calc_latency(cur_req)))
                     else:
                         true_cold += 1
+            to_graph.setdefault(params['triggerType'], {}).setdefault(params['memorySize'],{}).setdefault('incrementSize', params['incrementSize'])
+            to_graph.setdefault(params['triggerType'], {}).setdefault(params['memorySize'],{}).setdefault('incrementPeriod', params['incrementPeriod'])
 
-            to_graph[params['triggerType']][params['memorySize']]['incrementSize'] = params['incrementSize']
-            to_graph[params['triggerType']][params['memorySize']]['incrementPeriod'] = params['incrementPeriod']
             to_graph.setdefault(params['triggerType'], {}).setdefault(params['memorySize'],{}).setdefault('reqs', {}).setdefault(cur_tick, []).append(counter)
             to_graph.setdefault(params['triggerType'], {}).setdefault(params['memorySize'],{}).setdefault('new_vm_count', {}).setdefault(cur_tick, []).append(pre_warms + true_cold)
             to_graph.setdefault(params['triggerType'], {}).setdefault(params['memorySize'],{}).setdefault('all_vm_count', {}).setdefault(cur_tick, []).append(len(vm_set))
+            print(to_graph[params['triggerType']][params['memorySize']]['all_vm_count'])
             cur_tick += 1
 
+
+    reqs_graphed = False
     for t, trigger in enumerate(sorted(to_graph.keys())):
         for m, mem_sz in enumerate(sorted(to_graph[trigger])):
             max_tick = 0
@@ -211,24 +214,38 @@ def cold_per_burst(data_files, out_prefix, interval=5):
             all_vm, all_vm_err = [], []
             for tick in sorted(to_graph[trigger][mem_sz]['reqs'].keys()):
                 reqs.append(np.average(to_graph[trigger][mem_sz]['reqs'][tick]))
-                reqs_err.append(np.std(to_graph[trigger][mem_sz]['reqs'][tick]))
                 max_tick = max(max_tick, tick*to_graph[trigger][mem_sz]['incrementPeriod']/1000)
             for tick in sorted(to_graph[trigger][mem_sz]['new_vm_count'].keys()):
                 new_vm.append(np.average(to_graph[trigger][mem_sz]['new_vm_count'][tick]))
                 new_vm_err.append(np.std(to_graph[trigger][mem_sz]['new_vm_count'][tick]))
+                print(to_graph[trigger][mem_sz]['new_vm_count'][tick])
             for tick in sorted(to_graph[trigger][mem_sz]['all_vm_count'].keys()):
                 all_vm.append(np.average(to_graph[trigger][mem_sz]['all_vm_count'][tick]))
                 all_vm_err.append(np.std(to_graph[trigger][mem_sz]['all_vm_count'][tick]))
-            expct.append(sum(run_times)/max(1, len(run_times))/1000 * (params['initRate']+params['incrementSize']*cur_tick))
 
-        y_tmp = to_graph.setdefault(params['triggerType'], {}).setdefault(params['memorySize'],{}).setdefault('y_tmp', {})
+            max_tick += 1
+            # ax.plot(ticks, new_vm_count, '^-', label='new VMs this round', color='C' + str(idx))
+            # ax.plot(ticks, warm_count, 'o-', label='pre-warmed VMs (cold latency < VM lifetime)', color='C' + str(idx))
+            ax.errorbar(np.arange(0, (max_tick+1), to_graph[trigger][mem_sz]['incrementPeriod']/1000),
+                all_vm,
+                yerr=all_vm_err,
+                fmt='v-',
+                label='total ' + trigger + ' ' + mem_sz + ' MB VMs seen (next ' + str(to_graph[trigger][mem_sz]['incrementPeriod']/1000) + ' seconds)', color='C' + str(t+m))
+            ax.plot(np.arange(0, (max_tick+1), to_graph[trigger][mem_sz]['incrementPeriod']/1000),
+                reqs,
+                'h--',
+                color='pink')
+            # ax.plot(ticks, expct, 's-', label='expected ' + params['triggerType'] + ' VMs sent', color='C' + str(idx))
 
 
-        # ax.plot(ticks, new_vm_count, '^-', label='new VMs this round', color='C' + str(idx))
-        # ax.plot(ticks, warm_count, 'o-', label='pre-warmed VMs (cold latency < VM lifetime)', color='C' + str(idx))
-        ax.plot(ticks, all_vm_count, 'v-', label='total ' + params['triggerType'] + ' ' + str(params['memorySize']) + ' MB VMs seen (next ' + str(params['incrementPeriod']/1000) + ' seconds)', color='C' + str(idx))
-        # ax.plot(ticks, expct, 's-', label='expected ' + params['triggerType'] + ' VMs sent', color='C' + str(idx))
-    ax.plot(ticks, reqs, 'h--', label='total requests sent (next ' + str(params['incrementPeriod']/1000) + ' seconds)', color='pink')
+
+    # expct.append(sum(run_times)/max(1, len(run_times))/1000 * (params['initRate']+params['incrementSize']*cur_tick))
+
+    # y_tmp = to_graph.setdefault(params['triggerType'], {}).setdefault(params['memorySize'],{}).setdefault('y_tmp', {})
+
+
+
+    # ax.plot(ticks, reqs, 'h--', label='total requests sent (next ' + str(params['incrementPeriod']/1000) + ' seconds)', color='pink')
 
     plt.xlabel('Time', fontsize=16)
     plt.ylabel('Count', fontsize=16)

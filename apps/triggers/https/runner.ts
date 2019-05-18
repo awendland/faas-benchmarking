@@ -84,9 +84,14 @@ export default class HttpsRunner
 
   async setup() {}
 
+  async runOne(): Promise<IResult> {
+    const requests
+  }
+
   async run(): Promise<IResult> {
     const requests: IRequestRecord[] = []
     const cannons: Array<EventEmitter & { stop: () => void }> = []
+    const cannonDones: Array<Promise<any>> = []
     ;(tls as any).DEFAULT_ECDH_CURVE = 'auto'
 
     for (let period = 0; period < this.params.numberOfPeriods; ++period) {
@@ -116,7 +121,7 @@ export default class HttpsRunner
           // so the 'done' event actually fires.
           maxOverallRequests:
             this.params.numberOfPeriods === 1
-              ? this.params.incrementMsgPerSec
+              ? this.params.initialMsgPerSec
               : undefined,
           body: this.messageBody,
           setupClient: (client: EventEmitter) => {
@@ -144,10 +149,16 @@ export default class HttpsRunner
             )
           },
         }
+        console.debug(this.params, autocannonArgs)
         const cannon = autocannon(autocannonArgs, () => {})
         cannon.on('error', console.log)
         cannon.on('reqError', console.log)
         cannons.push(cannon)
+        cannonDones.push(
+          new Promise(resolve => {
+            cannon.on('done', resolve)
+          }),
+        )
       }
 
       if (this.params.incrementPeriod) {
@@ -158,19 +169,11 @@ export default class HttpsRunner
     }
 
     // Stop all cannons
-    const cannonResultsP = Promise.all(
-      cannons.map(
-        c =>
-          new Promise(resolve => {
-            c.on('done', resolve)
-          }),
-      ),
-    )
     if (this.params.numberOfPeriods !== 1) {
       console.debug(`Terminating autocannons`)
       cannons.forEach(c => c.stop())
     }
-    const cannonResults = await cannonResultsP
+    const cannonResults = await Promise.all(cannonDones)
     console.debug(
       `Average rps from autocannons: ${cannonResults.map(
         (r: any) => r.requests.average,
@@ -189,8 +192,13 @@ export default class HttpsRunner
         const httpReq = Buffer.concat(request.rawData)
           .toString('utf8')
           .split('\r\n\r\n')
-        if (httpReq.length === 1) faasData = JSON.parse(httpReq[0])
-        else faasData = JSON.parse(httpReq[1])
+        try {
+          if (httpReq.length === 1) faasData = JSON.parse(httpReq[0])
+          else faasData = JSON.parse(httpReq[1])
+        } catch (e) {
+          console.error(httpReq)
+          console.error(e)
+        }
       }
       return {
         startTime: request.startTime,

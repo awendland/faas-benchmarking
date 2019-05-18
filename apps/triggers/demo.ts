@@ -26,7 +26,7 @@ const params = decodeOrThrow(
     {
       initialMsgPerSec: 30,
       incrementPeriod: 10 * 1e3,
-      numberOfPeriods: 1,
+      numberOfPeriods: 5,
       faasParams: {},
     },
     argv,

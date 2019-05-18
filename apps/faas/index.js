@@ -18,6 +18,14 @@ const url = require('url')
 
 const delay = ms => new Promise(res => setTimeout(() => res(), ms))
 
+const tryToParseJsonObj = str => {
+  try {
+    return JSON.parse(str)
+  } catch {
+    return {}
+  }
+}
+
 //////////////////////
 // Standard Handler //
 //////////////////////
@@ -30,17 +38,19 @@ module.exports.handler = async args => {
   if (sleep) {
     await delay(sleep)
   }
-  const body = JSON.stringify({
+  const bodyTemplate = JSON.stringify({
     id,
     initTime,
     runCount,
     triggeredTime,
-    processingTime: Date.now() - triggeredTime, // Doesn't capture all processing time
+    processingTime: 'PROCESSING_TIME', // To be replaced w/
     requestId,
     sleep,
     webhook,
     providerData,
   })
+  const bodyLatest = () =>
+    bodyTemplate.replace('PROCESSING_TIME', Date.now() - triggeredTime)
   if (webhook) {
     await new Promise((resolve, reject) => {
       // TODO better socket timing (open socket, then record time and send HTTP request manually, with updated time)
@@ -59,11 +69,11 @@ module.exports.handler = async args => {
       request.on('timeout', () => {
         request.abort()
       })
-      request.write(body)
+      request.write(bodyLatest())
       request.end()
     })
   }
-  return body
+  return bodyLatest()
 }
 
 ////////////////////////
@@ -91,6 +101,7 @@ module.exports.aws_https = async (event, context) => {
   const triggeredTime = Date.now()
   const body = await module.exports.handler({
     ...(event.queryStringParameters || {}),
+    ...tryToParseJsonObj(event.body),
     ...awsExtractContextDetails(context),
     triggeredTime,
   })
