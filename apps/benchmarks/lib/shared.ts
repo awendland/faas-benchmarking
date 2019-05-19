@@ -2,9 +2,9 @@ import * as fs from 'fs-extra'
 import * as Path from 'path'
 import minimist from 'minimist'
 import publicIp from 'public-ip'
-import { IInfraType, IFaasSize } from '../infrastructure/shared'
-import { decodeOrThrow } from '../shared/utils'
-import { Provider, IProvider, IContext, Context } from '../shared'
+import { IInfraType, IFaasSize } from '../../infrastructure/shared'
+import { decodeOrThrow } from '../../shared/utils'
+import { Provider, IProvider, IContext, Context } from '../../shared'
 
 /**
  * Parse arguments to produce relevant constructors, values, and other useful
@@ -21,7 +21,7 @@ export const handleArgs = ({
 
   const provider = decodeOrThrow(argv.provider, Provider)
   const orchestratorModule = require('./' +
-    Path.join('../infrastructure', provider, infraType, 'orchestrator'))
+    Path.join('../../infrastructure', provider, infraType, 'orchestrator'))
 
   return {
     argv,

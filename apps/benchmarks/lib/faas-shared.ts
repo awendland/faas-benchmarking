@@ -1,16 +1,74 @@
-import { IContext } from '../shared'
+import { IContext } from '../../shared'
 import {
   IFaasSize,
   IOrchestrator,
   IOrchestratorModule,
-} from '../infrastructure/shared'
-import { decodeOrThrow, tryThenTeardown } from '../shared/utils'
-import { appendResultFile } from './shared'
+  FaasSizes,
+  IInfraType,
+} from '../../infrastructure/shared'
+import { decodeOrThrow, tryThenTeardown } from '../../shared/utils'
+import { appendResultFile, handleArgs, prepareContext } from './shared'
 import {
   msgPerSecToPeriod,
   IRunnerConstructor,
   IBaseRunnerParams,
-} from '../triggers/shared'
+} from '../../triggers/shared'
+
+/**
+ * Create a function to run a benchmark (appropriately typed for
+ * the given provider, infrastructure, and trigger).
+ */
+export const createBenchmarkSuiteForInfra = ({
+  benchmarkRunner,
+  infraType,
+}: {
+  benchmarkRunner: ReturnType<typeof createBenchmarkRunnerForInfra>
+  infraType: IInfraType
+}) => async ({
+  benchmarkName,
+  numberOfFunctions,
+  initialMsgPerSec,
+  incrementMsgPerSec,
+  incrementPeriod,
+  numberOfPeriods,
+  functionSleep,
+}: {
+  benchmarkName: string
+  numberOfFunctions: number
+  initialMsgPerSec: number
+  incrementMsgPerSec?: number | undefined
+  incrementPeriod?: number | undefined
+  numberOfPeriods?: number | undefined
+  functionSleep?: number | undefined
+}) => {
+  const { argv, provider, OrchestratorModule } = handleArgs({
+    processArgv: process.argv,
+    infraType: infraType,
+  })
+
+  for (const memorySize of Object.keys(FaasSizes) as IFaasSize[]) {
+    console.debug(`Testing https-${benchmarkName} for ${memorySize} MB FaaS`)
+    const context = await prepareContext({
+      benchmarkType: `${infraType.replace('faas-', '')}-${benchmarkName}`,
+      memorySize,
+      provider,
+      argv,
+    })
+    for (let i = 0; i < (argv.loops || 1); i++) {
+      await benchmarkRunner({
+        numberOfFunctions,
+        initialMsgPerSec,
+        incrementMsgPerSec,
+        incrementPeriod,
+        numberOfPeriods,
+        functionSleep: argv.functionSleep || functionSleep,
+        memorySize: memorySize,
+        context,
+        OrchestratorModule,
+      }).catch(console.error)
+    }
+  }
+}
 
 /**
  * Creates a functions for running benchmarls for any trigger type.
@@ -19,7 +77,11 @@ import {
  * of resources that can be created in a given CloudFormation (expressed
  * indirectly as numberOfFunctions).
  */
-export const runTrialBatchGen = <O extends IOrchestrator, Infra, Target>({
+export const createBenchmarkRunnerForInfra = <
+  O extends IOrchestrator,
+  Infra,
+  Target
+>({
   targetIterator,
   Runner,
 }: {
@@ -52,7 +114,7 @@ export const runTrialBatchGen = <O extends IOrchestrator, Infra, Target>({
       numberOfFunctions,
       memorySize,
       runtime: 'node8',
-      sourceDir: __dirname + '/../faas',
+      sourceDir: __dirname + '/../../faas',
       timeout: 30,
     },
     OrchestratorModule.ParamsType,

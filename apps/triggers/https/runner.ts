@@ -154,7 +154,7 @@ export default class HttpsRunner
       req.on('error', err => reject(err))
       req.end()
     })
-    console.debug(`Established connection`)
+    console.debug(`Established connection to ${hostname}:${port}`)
     return await new Promise((resolve, reject) => {
       const requestOptions = {
         hostname,

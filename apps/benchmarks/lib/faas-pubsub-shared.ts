@@ -1,14 +1,14 @@
-import { IContext } from '../shared'
+import { IContext } from '../../shared'
 import {
   IFaasSize,
   IPubsubFaasOrchestrator,
   FaasSizes,
   IOrchestratorModule,
-} from '../infrastructure/shared'
-import { decodeOrThrow, tryThenTeardown } from '../shared/utils'
-import PubsubFaasRunner from '../triggers/pubsub/runner'
+} from '../../infrastructure/shared'
+import { decodeOrThrow, tryThenTeardown } from '../../shared/utils'
+import PubsubFaasRunner from '../../triggers/pubsub/runner'
 import { appendResultFile } from './shared'
-import { msgPerSecToPeriod } from '../triggers/shared'
+import { msgPerSecToPeriod } from '../../triggers/shared'
 
 type StaticOrDynamicBatch =
   | {
@@ -52,7 +52,7 @@ export const runTrialBatch = async ({
       numberOfFunctions,
       memorySize,
       runtime: 'node8',
-      sourceDir: __dirname + '/../faas',
+      sourceDir: __dirname + '/../../faas',
       timeout: 30,
     },
     OrchestratorModule.ParamsType,

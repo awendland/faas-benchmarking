@@ -1,6 +1,6 @@
 import { IFaasSize, FaasSizes } from '../infrastructure/shared'
-import { handleArgs, prepareContext } from './shared'
-import { runTrialBatch } from './faas-pubsub-shared'
+import { handleArgs, prepareContext } from './lib/shared'
+import { runTrialBatch } from './lib/faas-pubsub-shared'
 
 ///////////////////
 // Warm Constant //
