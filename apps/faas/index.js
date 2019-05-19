@@ -69,6 +69,7 @@ module.exports.handler = async args => {
       request.on('timeout', () => {
         request.abort()
       })
+      request.setNoDelay(true)
       request.write(bodyLatest())
       request.end()
     })
