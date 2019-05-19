@@ -21,7 +21,7 @@ const delay = ms => new Promise(res => setTimeout(() => res(), ms))
 const tryToParseJsonObj = str => {
   try {
     return JSON.parse(str)
-  } catch {
+  } catch (e) {
     return {}
   }
 }
