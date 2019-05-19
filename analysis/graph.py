@@ -105,7 +105,9 @@ def cdf(data_files, out_prefix, filter="all", multi="memorySize"):
             y.append((i+1) / num_points * 100)
         x[1] = min_x
 
-        if multi == "memorySize":
+        if filter == "warm":
+            label = '{} MB VM (n={})'.format(m, int(len(data_files) / 5))
+        elif multi =="memorySize":
             label = '{} MB VM (n={})'.format(m, len(filtered_resp))
         else:
             label = '{} trigger (n={})'.format(m, len(filtered_resp))
@@ -176,6 +178,7 @@ def cold_per_burst(data_files, out_prefix, interval=5):
         reqs = []
 
         cur_tick = 0
+        to_graph[params['triggerType']][params['memorySize']]['n'] = to_graph.setdefault(params['triggerType'], {}).setdefault(params['memorySize'],{}).setdefault('n', 0) + 1
 
         while responses:
             counter = 0
@@ -201,7 +204,7 @@ def cold_per_burst(data_files, out_prefix, interval=5):
             to_graph.setdefault(params['triggerType'], {}).setdefault(params['memorySize'],{}).setdefault('reqs', {}).setdefault(cur_tick, []).append(counter)
             to_graph.setdefault(params['triggerType'], {}).setdefault(params['memorySize'],{}).setdefault('new_vm_count', {}).setdefault(cur_tick, []).append(pre_warms + true_cold)
             to_graph.setdefault(params['triggerType'], {}).setdefault(params['memorySize'],{}).setdefault('all_vm_count', {}).setdefault(cur_tick, []).append(len(vm_set))
-            print(to_graph[params['triggerType']][params['memorySize']]['all_vm_count'])
+            # print(to_graph[params['triggerType']][params['memorySize']]['all_vm_count'])
             cur_tick += 1
 
 
@@ -218,7 +221,7 @@ def cold_per_burst(data_files, out_prefix, interval=5):
             for tick in sorted(to_graph[trigger][mem_sz]['new_vm_count'].keys()):
                 new_vm.append(np.average(to_graph[trigger][mem_sz]['new_vm_count'][tick]))
                 new_vm_err.append(np.std(to_graph[trigger][mem_sz]['new_vm_count'][tick]))
-                print(to_graph[trigger][mem_sz]['new_vm_count'][tick])
+                # print(to_graph[trigger][mem_sz]['new_vm_count'][tick])
             for tick in sorted(to_graph[trigger][mem_sz]['all_vm_count'].keys()):
                 all_vm.append(np.average(to_graph[trigger][mem_sz]['all_vm_count'][tick]))
                 all_vm_err.append(np.std(to_graph[trigger][mem_sz]['all_vm_count'][tick]))
@@ -230,7 +233,9 @@ def cold_per_burst(data_files, out_prefix, interval=5):
                 all_vm,
                 yerr=all_vm_err,
                 fmt='v-',
-                label='total ' + trigger + ' ' + mem_sz + ' MB VMs seen (next ' + str(to_graph[trigger][mem_sz]['incrementPeriod']/1000) + ' seconds)', color='C' + str(t+m))
+                label='total ' + trigger + ' ' +
+                    mem_sz + ' MB VMs seen (next ' + str(to_graph[trigger][mem_sz]['incrementPeriod']/1000) +
+                    ' seconds) (n = {})'.format(to_graph[trigger][mem_sz]['n']), color='C' + str(t+m))
             ax.plot(np.arange(0, (max_tick+1), to_graph[trigger][mem_sz]['incrementPeriod']/1000),
                 reqs,
                 'h--',

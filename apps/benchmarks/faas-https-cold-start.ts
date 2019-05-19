@@ -7,7 +7,7 @@ import { createHttpsBenchmark } from './lib/faas-https-shared'
 createHttpsBenchmark({
   benchmarkName: 'cold-start',
   // Cloudformation max is 200 resources which is ~10 https fns
-  numberOfFunctions: 15,
+  numberOfFunctions: 58,
   initialMsgPerSec: 1,
   incrementMsgPerSec: 0,
   incrementPeriod: 2 * 1e3,

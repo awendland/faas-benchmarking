@@ -68,12 +68,16 @@ export default class AwsHttpsFaasOrchestrator
 
     // TODO use specified AWS region
     const serverlessYaml = `
+plugins:
+  - serverless-plugin-split-stacks
 service: ${this.context.projectName}
 provider:
   name: aws
   runtime: ${translateToAws.runtime(this.params.runtime)}
   stackName: ${this.context.projectName}
   apiName: ${this.context.projectName}
+  role: arn:aws:iam::762148782505:role/test-faas
+  versionFunctions: false
 package:
   artifact: ${packageZip}
 functions:
@@ -92,6 +96,14 @@ ${_.range(this.params.numberOfFunctions)
     await fs.writeFile(
       Path.join(this.tmpdir.path, 'serverless.yml'),
       serverlessYaml,
+    )
+
+    await fs.writeFile(
+      Path.join(this.tmpdir.path, 'stacks-map.json'),
+      `module.exports = {
+        'AWS::ApiGateway::Method': { destination: 'ApiGatewayMethod' },
+        'AWS::Logs::LogGroup': { destination: 'LogGroup' },
+      }`,
     )
 
     console.debug(`Running ${serverlessBin} deploy`)
