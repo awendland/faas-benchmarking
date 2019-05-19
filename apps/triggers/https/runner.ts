@@ -1,5 +1,7 @@
 import * as t from 'io-ts'
 import * as tls from 'tls'
+import * as https from 'https'
+import { HttpsAgent as KeepAliveAgent } from 'agentkeepalive'
 import { URL } from 'url'
 const autocannon = require('autocannon')
 import { IContext, IFaasResponse, IFaasParams } from '../../shared/types'
@@ -49,13 +51,19 @@ export type IRequestId = string
 
 export const RequestRecord = t.type({
   /**
-   * Set synthetically during the 'response' event from autocannon. Set to
-   * the current Date.now() - responseTime (from the autocannon event).
+   * If Autocannon:
+   *  Set synthetically during the 'response' event from autocannon. Set to
+   *  the current Date.now() - responseTime (from the autocannon event).
+   * If https.request:
+   *  Set immediately before calling write() then end() on the request.
    */
   startTime: t.number,
   /**
-   * Set synthetically during the 'response' event from autocannon. Set to
-   * the current Date.now().
+   * If Autocannon:
+   *  Set synthetically during the 'response' event from autocannon. Set to
+   *  the current Date.now().
+   * If https.request:
+   *  Set upon the first 'body' event.
    */
   endTime: t.number,
   /**
@@ -85,6 +93,106 @@ export default class HttpsRunner
   async setup() {}
 
   async run(): Promise<IResult> {
+    let requests: IRequestRecord[]
+    if (
+      this.params.numberOfPeriods === 1 &&
+      this.params.initialMsgPerSec === 1
+    ) {
+      requests = await this.runPrewarmedRequest()
+    } else {
+      requests = await this.runAutocannon()
+    }
+    // Decode results
+    const events: IResultEvent[] = requests.map(request => {
+      let faasData, invalidResponse
+      if (request.rawData.length) {
+        const httpReq = Buffer.concat(request.rawData)
+          .toString('utf8')
+          .split('\r\n\r\n')
+        try {
+          if (httpReq.length === 1) faasData = JSON.parse(httpReq[0])
+          else faasData = JSON.parse(httpReq[1])
+        } catch (e) {
+          invalidResponse = httpReq.join('\r\n\r\n')
+        }
+      }
+      return {
+        startTime: request.startTime,
+        endTime: request.endTime,
+        response: faasData,
+        invalidResponse,
+      }
+    })
+    return {
+      events,
+    }
+  }
+
+  async teardown(): Promise<void> {
+    /* noop */
+  }
+
+  private async runPrewarmedRequest(): Promise<IRequestRecord[]> {
+    console.debug(`Using PrewarmedRequest instead of Autocannon`)
+    const agent = new KeepAliveAgent({
+      // Arbitrary large numbers
+      freeSocketTimeout: 24 * 60 * 60 * 1e3,
+      maxCachedSessions: 1e3,
+      maxFreeSockets: 1e3,
+      maxSockets: 1e3,
+    })
+    const url = new URL(this.targets.url)
+    let { hostname, port } = url
+    if (!port) port = url.protocol === 'https:' ? '443' : '80'
+    await new Promise((resolve, reject) => {
+      const reqOptions = { hostname, port, method: 'HEAD', agent }
+      // TODO pre-warm TCP connection only, don't make full HTTP request
+      const req = https.request(reqOptions, res => {
+        res.resume()
+        res.on('end', () => resolve())
+      })
+      req.on('error', err => reject(err))
+      req.end()
+    })
+    console.debug(`Established connection`)
+    return await new Promise((resolve, reject) => {
+      const requestOptions = {
+        hostname,
+        port,
+        path: url.pathname,
+        method: 'POST',
+        agent,
+      }
+      const request = https.request(requestOptions)
+      let startTime: number
+      request.once('response', res => {
+        let endTime: number
+        const rawData: Buffer[] = []
+        res.on('data', (chunk: Buffer) => {
+          if (!endTime) endTime = Date.now()
+          rawData.push(chunk)
+        })
+        res.on('error', (e: Error) => {
+          throw e
+        })
+        res.on('end', () => {
+          resolve([
+            {
+              startTime,
+              endTime,
+              rawData,
+            },
+          ])
+        })
+      })
+      request.setNoDelay(true)
+      startTime = Date.now()
+      request.write(this.messageBody)
+      request.end()
+    })
+  }
+
+  private async runAutocannon(): Promise<IRequestRecord[]> {
     const requests: IRequestRecord[] = []
     const cannons: Array<EventEmitter & { stop: () => void }> = []
     const cannonDones: Array<Promise<any>> = []
@@ -181,33 +289,6 @@ export default class HttpsRunner
       )}`,
     )
 
-    // Decode results
-    const events: IResultEvent[] = requests.map(request => {
-      let faasData, invalidResponse
-      if (request.rawData.length) {
-        const httpReq = Buffer.concat(request.rawData)
-          .toString('utf8')
-          .split('\r\n\r\n')
-        try {
-          if (httpReq.length === 1) faasData = JSON.parse(httpReq[0])
-          else faasData = JSON.parse(httpReq[1])
-        } catch (e) {
-          invalidResponse = httpReq.join('\r\n\r\n')
-        }
-      }
-      return {
-        startTime: request.startTime,
-        endTime: request.endTime,
-        response: faasData,
-        invalidResponse,
-      }
-    })
-    return {
-      events,
-    }
-  }
-
-  async teardown(): Promise<void> {
-    /* noop */
+    return requests
   }
 }
