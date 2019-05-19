@@ -55,7 +55,12 @@ for (const line of file.split('\n').filter(l => l.trim().length > 0)) {
       incrementPeriod: (trialRun.data as any).incrementPeriod || null,
     }
   }
+  let numberOfErrors = 0
   for (const event of trialRun.data.results.events) {
+    if (!event.response) {
+      numberOfErrors++
+      continue
+    }
     responses.push({
       id: event.response.id,
       runCount: event.response.runCount,
@@ -66,6 +71,7 @@ for (const line of file.split('\n').filter(l => l.trim().length > 0)) {
       endTime: event.endTime,
     })
   }
+  console.log(`Omitted ${numberOfErrors} requests with invalid response bodies`)
 }
 
 const output: GraphFormat = {
