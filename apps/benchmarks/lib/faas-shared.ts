@@ -56,7 +56,7 @@ export const createBenchmarkSuiteForInfra = ({
     })
     for (let i = 0; i < (argv.loops || 1); i++) {
       await benchmarkRunner({
-        numberOfFunctions,
+        numberOfFunctions: numberOfFunctions || argv.numberOfFunctions,
         initialMsgPerSec,
         incrementMsgPerSec,
         incrementPeriod,
