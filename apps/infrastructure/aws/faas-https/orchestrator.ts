@@ -7,7 +7,7 @@ import * as _ from 'lodash'
 import { dir as createtmpdir, DirectoryResult } from 'tmp-promise'
 import { IContext } from '../../../shared/types'
 import { decodeOrThrow } from '../../../shared/utils'
-import { serverlessBin } from '../shared'
+import { serverlessBin, serverlessPluginSplitStacksDir } from '../shared'
 import { translateToAws, prepareHandlerCodeZip } from '../faas'
 import {
   IHttpsFaasOrchestrator,
@@ -67,6 +67,7 @@ export default class AwsHttpsFaasOrchestrator
     await prepareHandlerCodeZip(Path.resolve(this.params.sourceDir), packageZip)
 
     // TODO use specified AWS region
+    // TODO stop using hardcoded IAM role
     const serverlessYaml = `
 plugins:
   - serverless-plugin-split-stacks
@@ -104,6 +105,13 @@ ${_.range(this.params.numberOfFunctions)
         'AWS::ApiGateway::Method': { destination: 'ApiGatewayMethod' },
         'AWS::Logs::LogGroup': { destination: 'LogGroup' },
       }`,
+    )
+
+    const nodeModulesPath = Path.join(this.tmpdir.path, 'node_modules')
+    await fs.mkdirp(nodeModulesPath)
+    await fs.symlink(
+      serverlessPluginSplitStacksDir,
+      Path.join(nodeModulesPath, 'serverless-plugin-split-stacks'),
     )
 
     console.debug(`Running ${serverlessBin} deploy`)

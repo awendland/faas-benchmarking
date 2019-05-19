@@ -10,3 +10,11 @@ export const serverlessBin = (() => {
   const prefix = serverlessFile.split('node_modules')[0]
   return Path.join(prefix, 'node_modules', '.bin', 'serverless')
 })()
+
+/**
+ * Path to the `serverless-plugin-split-stacks` installation folder, to
+ * be symlinked to by the serverless temp directory.
+ */
+export const serverlessPluginSplitStacksDir = Path.dirname(
+  require.resolve('serverless-plugin-split-stacks'),
+)
