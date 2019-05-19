@@ -46,7 +46,9 @@ export const createBenchmarkSuiteForInfra = ({
     infraType: infraType,
   })
   const memorySizes: IFaasSize[] =
-    (argv.memorySizes && argv.memorySizes.split(',')) || Object.keys(FaasSizes)
+    (argv.memorySizes &&
+      (String(argv.memorySizes).split(',') as IFaasSize[])) ||
+    Object.keys(FaasSizes)
   console.log(`Running for memory sizes=${memorySizes}`)
   for (const memorySize of memorySizes) {
     console.debug(`Testing https-${benchmarkName} for ${memorySize} MB FaaS`)
