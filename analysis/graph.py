@@ -21,7 +21,10 @@ def latency_rate(data_files, out_prefix, percentiles="5,95"):
 
         y_tmp = to_graph.setdefault(params['triggerType'], {}).setdefault(params['memorySize'],{}).setdefault('y_tmp', {})
         for response in responses:
-            y_tmp.setdefault(response['tick'], []).append(calc_latency(response))
+            try:
+                y_tmp.setdefault(response['tick'], []).append(calc_latency(response))
+            except ValueError:
+                pass
 
         to_graph[params['triggerType']][params['memorySize']]['y_tmp'] = y_tmp
         to_graph[params['triggerType']][params['memorySize']]['incrementPeriod'] = params['incrementPeriod']
@@ -52,7 +55,11 @@ def latency_rate(data_files, out_prefix, percentiles="5,95"):
     plt.title(params['triggerType'] + ' Latency Over Time (5, 95 percentile bars)')
     # plt.xticks()
     plt.show()
-    plt.legend(loc='best', bbox_to_anchor=(0.5, 0., 0.5, 0.5))
+    ax = plt.subplot(111)
+    handles,labels = ax.get_legend_handles_labels()
+    handles = [handles[1], handles[3], handles[4], handles[0], handles[2]]
+    labels = [labels[1], labels[3], labels[4], labels[0], labels[2]]
+    ax.legend(handles,labels,loc='best', bbox_to_anchor=(0.5, 0., 0.5, 0.5))
     plt.ylim(bottom=0)
     plt.savefig(out_prefix + "_latency_line" + '.png')
 
@@ -62,7 +69,7 @@ def latency_rate(data_files, out_prefix, percentiles="5,95"):
 # multi is either "vm_size" or "trigger"
 def cdf(data_files, out_prefix, filter="all", multi="memorySize"):
     data_files.sort(key=lambda d: d['params']['memorySize'])
-    fig = plt.figure(figsize=(12,5))
+    fig = plt.figure(figsize=(8,5))
     ax = plt.subplot(111)
     vm_set = set()
     min_x = float("inf")
@@ -92,8 +99,16 @@ def cdf(data_files, out_prefix, filter="all", multi="memorySize"):
 
         to_graph[params[multi]] = to_graph.setdefault(params[multi], []) + filtered_resp
 
+    # all_x = []
     for idx, m in enumerate(sorted(to_graph.keys())):
-        filtered_resp = sorted(map(lambda r: (calc_latency(r)), to_graph[m]))
+        filtered_resp = []
+        for i in to_graph[m]:
+            try:
+                filtered_resp.append(calc_latency(i))
+            except ValueError:
+                pass
+        filtered_resp = sorted(filtered_resp)
+        #filtered_resp = sorted(map(lambda r: (calc_latency(r)), to_graph[m]))
 
         num_points = len(filtered_resp)
         x, y = [0,0], [0,0]
@@ -104,6 +119,7 @@ def cdf(data_files, out_prefix, filter="all", multi="memorySize"):
             min_x = min(min_x, filtered_resp[i])
             y.append((i+1) / num_points * 100)
         x[1] = min_x
+        #all_x.extend(x)
 
         if filter == "warm":
             label = '{} MB VM (n={})'.format(m, int(len(data_files) / 5))
@@ -117,6 +133,11 @@ def cdf(data_files, out_prefix, filter="all", multi="memorySize"):
                 label=label,
                 color='C'+str(idx))
 
+    # all_x = sorted(all_x)
+    # print (np.median(all_x), all_x[5], all_x[-1], np.std(all_x), all_x[int(len(all_x) * .9)])
+    # import sys
+    # sys.exit()
+
     test_type = ''
     if filter=="cold":
         test_type="Cold "
@@ -128,13 +149,17 @@ def cdf(data_files, out_prefix, filter="all", multi="memorySize"):
 
     plt.grid(True)
     # tunable to change axes
-    plt.xticks(np.arange(0, 100*(max_x//100+2), step=100))
+    plt.xticks(np.arange(0, 100*(max_x//100+2), step=100), rotation='vertical')
     plt.yticks(np.arange(0, 120, step=20))
+    plt.subplots_adjust(bottom=0.15)
 
-    ax.legend(loc='lower right')
+    handles,labels = ax.get_legend_handles_labels()
+    handles = [handles[1], handles[3], handles[4], handles[0], handles[2]]
+    labels = [labels[1], labels[3], labels[4], labels[0], labels[2]]
+    ax.legend(handles,labels,loc='lower right')
     if multi == "memorySize":
         if len(data_files) > 1:
-            title = data_files[0]['params']['triggerType'] + ' ' + test_type + 'Start Latency with Varying Request Sizes'
+            title = data_files[0]['params']['triggerType'] + ' ' + test_type + 'Start Latency with Varying VM Memory Sizes'
             plt.title(title)
             plt.savefig(out_prefix + "_mSZ_CDF_" + filter + '.png')
         else:
@@ -164,7 +189,7 @@ def cold_per_burst(data_files, out_prefix, interval=5):
     ax = plt.subplot(111)
 
     to_graph = {}
-
+    neg_rtts = 0
     for data_file in data_files:
         data_file = add_ticks(data_file)
         params = data_file['params']
@@ -193,11 +218,15 @@ def cold_per_burst(data_files, out_prefix, interval=5):
                 counter += 1
                 vm_set.add(cur_req['id'])
                 if cur_req['runCount'] == 1:
-                    if cur_req['triggeredTime'] - cur_req['initTime'] > calc_latency(cur_req):
-                        pre_warms += 1
-                        print("PREWARM {} {}".format(cur_req['triggeredTime'] - cur_req['initTime'], calc_latency(cur_req)))
-                    else:
-                        true_cold += 1
+                    try:
+                        if cur_req['triggeredTime'] - cur_req['initTime'] > calc_latency(cur_req):
+                            pre_warms += 1
+                            print("PREWARM {} {}".format(cur_req['triggeredTime'] - cur_req['initTime'], calc_latency(cur_req)))
+                        else:
+                            true_cold += 1
+                    except ValueError as e:
+                        neg_rtts += 1
+                        pass
             to_graph.setdefault(params['triggerType'], {}).setdefault(params['memorySize'],{}).setdefault('incrementSize', params['incrementSize'])
             to_graph.setdefault(params['triggerType'], {}).setdefault(params['memorySize'],{}).setdefault('incrementPeriod', params['incrementPeriod'])
 
@@ -207,7 +236,7 @@ def cold_per_burst(data_files, out_prefix, interval=5):
             # print(to_graph[params['triggerType']][params['memorySize']]['all_vm_count'])
             cur_tick += 1
 
-
+    print (neg_rtts)
     reqs_graphed = False
     for t, trigger in enumerate(sorted(to_graph.keys())):
         for m, mem_sz in enumerate(sorted(to_graph[trigger])):
@@ -259,7 +288,10 @@ def cold_per_burst(data_files, out_prefix, interval=5):
 
     # plt.title('VM Count vs Scaling ' + params['triggerType'] + ' Requests')
     plt.title('VM Count Over Time')
-    ax.legend(loc='lower right', bbox_to_anchor=(1,0))
+    handles,labels = ax.get_legend_handles_labels()
+    handles = [handles[1], handles[3], handles[4], handles[0], handles[2]]
+    labels = [labels[1], labels[3], labels[4], labels[0], labels[2]]
+    ax.legend(handles,labels,loc='lower right', bbox_to_anchor=(1,0))
     plt.show()
 
     plt.ylim(bottom=0)

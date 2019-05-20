@@ -1,10 +1,11 @@
 import json
 
 def calc_latency(response):
-    latency = response['endTime'] - response['startTime'] - response['processingTime']
+    latency = response['endTime'] - response['startTime'] - int(response['processingTime'])
     if latency < 0:
-        print("error neg req rtt")
-    return latency
+        raise ValueError("error neg req rtt")
+    else:
+        return latency
 
 def load_data_files(files):
     data_files = []

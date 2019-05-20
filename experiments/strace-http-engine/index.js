@@ -12,7 +12,7 @@ if (require.main === module) {
     if (!fs.existsSync(workDir)) {
       fs.mkdirSync(workDir)
     }
-    const cmd = `node ../../../apps/engine_runner.js --urls https://alexwendland.com --window-size 10000 --duration 1000 --rpw 10`
+    const cmd = `node ../../../deprecated/apps/engine_runner.js --urls https://alexwendland.com --window-size 10000 --duration 1000 --rpw 10`
     await straceScript(`traces`, cmd, workDir)
   })().catch(e => {
     console.error(e.stack)

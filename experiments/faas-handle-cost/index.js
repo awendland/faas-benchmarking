@@ -1,6 +1,8 @@
-const log = console.log
-console.log = () => {}
+const log = console.error
+process.stdout.write = () => {}
+const requireStartTime = Date.now()
 const faasSrc = require('../../apps/faas/index')
+log(`Took ${Date.now() - requireStartTime}ms to require('faas/index.js')`)
 
 const run = async () => {
   const numRuns = 1e6
